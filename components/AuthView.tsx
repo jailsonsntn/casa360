@@ -12,7 +12,6 @@ import {
   User,
   AlertCircle,
   Loader2,
-  CheckCircle2,
   Inbox
 } from 'lucide-react';
 import { supabase } from '../services/supabaseClient';
@@ -75,8 +74,6 @@ const AuthView: React.FC<AuthViewProps> = ({ onLogin }) => {
         });
         
         if (signUpError) throw signUpError;
-
-        // Ativa o modo de sucesso para confirmação de e-mail
         setSuccessMode(true);
       } else {
         const { data, error: signInError } = await supabase.auth.signInWithPassword({
@@ -96,27 +93,22 @@ const AuthView: React.FC<AuthViewProps> = ({ onLogin }) => {
   if (successMode) {
     return (
       <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col items-center justify-center p-6 transition-colors duration-500">
-        <div className="w-full max-w-md bg-white dark:bg-slate-900 rounded-[3.5rem] shadow-2xl p-10 text-center space-y-8 animate-in zoom-in duration-500 border border-slate-100 dark:border-slate-800">
-          <div className="w-20 h-20 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 rounded-3xl flex items-center justify-center mx-auto shadow-lg">
+        <div className="w-full max-w-md bg-white dark:bg-slate-900 rounded-[3.5rem] shadow-2xl p-10 text-center space-y-8 border border-slate-100 dark:border-slate-800 animate-in zoom-in duration-500">
+          <div className="w-20 h-20 bg-indigo-100 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded-3xl flex items-center justify-center mx-auto shadow-lg">
             <Inbox className="w-10 h-10 animate-bounce" />
           </div>
           <div className="space-y-3">
-            <h2 className="text-2xl font-black text-slate-800 dark:text-white">Confirme seu E-mail</h2>
+            <h2 className="text-2xl font-black text-slate-800 dark:text-white tracking-tight">Verifique seu e-mail</h2>
             <p className="text-sm text-slate-500 dark:text-slate-400 leading-relaxed">
-              Enviamos um link de confirmação para <span className="font-black text-indigo-600">{email}</span>.
+              Enviamos um link de confirmação para <span className="font-bold text-indigo-600">{email}</span>. 
+              Por favor, clique no link para ativar sua conta.
             </p>
-            <div className="p-4 bg-indigo-50 dark:bg-indigo-900/20 rounded-2xl border border-indigo-100 dark:border-indigo-800 mt-4">
-              <p className="text-[10px] font-black text-indigo-600 dark:text-indigo-400 uppercase tracking-widest">Observação Importante</p>
-              <p className="text-xs text-slate-600 dark:text-slate-300 mt-2 font-medium">
-                Você precisa clicar no link do e-mail antes de conseguir fazer o login no Casa360.
-              </p>
-            </div>
           </div>
           <button 
             onClick={() => { setSuccessMode(false); setMode('login'); setPassword(''); }}
             className="w-full bg-slate-900 dark:bg-indigo-600 text-white py-5 rounded-2xl font-black text-sm flex items-center justify-center gap-3 hover:scale-[1.02] active:scale-95 transition-all shadow-xl"
           >
-            Voltar para Login
+            Ir para Login
           </button>
         </div>
       </div>
@@ -247,7 +239,7 @@ const AuthView: React.FC<AuthViewProps> = ({ onLogin }) => {
         )}
       </div>
       
-      <p className="mt-8 text-[10px] font-bold text-slate-400 dark:text-slate-600 uppercase tracking-[0.2em]">Versão 2.3 • Produção Estável</p>
+      <p className="mt-8 text-[10px] font-bold text-slate-400 dark:text-slate-600 uppercase tracking-[0.2em]">Versão 2.4 • Produção Estável</p>
     </div>
   );
 };
