@@ -62,43 +62,58 @@ const App: React.FC = () => {
   const [state, setState] = useState<HomeState>(INITIAL_STATE);
 
   useEffect(() => {
-    const initSession = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      await handleAuthChange(session);
-      setLoadingSession(false);
-    };
-    initSession();
+    let mounted = true;
 
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
-      setLoadingSession(true);
-      await handleAuthChange(session);
-      setLoadingSession(false);
+    const init = async () => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (mounted) {
+        if (session) {
+          await handleAuthChange(session);
+        }
+        setLoadingSession(false);
+      }
+    };
+
+    init();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (!mounted) return;
+      
+      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+        await handleAuthChange(session);
+        setLoadingSession(false);
+      } else if (event === 'SIGNED_OUT') {
+        setState(INITIAL_STATE);
+        setLoadingSession(false);
+      }
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
   const handleAuthChange = async (session: any) => {
-    if (!session) {
-      setState(INITIAL_STATE);
-      return;
-    }
+    if (!session) return;
 
     try {
-      // Busca paralela para velocidade
-      const [pRes, tRes, fRes, mRes, sRes] = await Promise.all([
-        supabase.from('profiles').select('*').eq('id', session.user.id).single(),
-        supabase.from('tasks').select('*').eq('user_id', session.user.id).order('created_at', { ascending: false }),
-        supabase.from('finance').select('*').eq('user_id', session.user.id).order('created_at', { ascending: false }),
-        supabase.from('medications').select('*').eq('user_id', session.user.id),
-        supabase.from('shopping_items').select('*').eq('user_id', session.user.id)
-      ]);
+      // Usando consultas individuais para evitar que uma falha trave tudo (Promise.allSettled seria outra opção)
+      const pRes = await supabase.from('profiles').select('*').eq('id', session.user.id).maybeSingle();
+      const tRes = await supabase.from('tasks').select('*').eq('user_id', session.user.id).order('created_at', { ascending: false });
+      const fRes = await supabase.from('finance').select('*').eq('user_id', session.user.id).order('created_at', { ascending: false });
+      const mRes = await supabase.from('medications').select('*').eq('user_id', session.user.id);
+      const sRes = await supabase.from('shopping_items').select('*').eq('user_id', session.user.id);
 
       const profileData = pRes.data;
       
       setState(prev => ({
         ...prev,
-        auth: { isLoggedIn: true, userEmail: session.user.email, lastLogin: new Date().toISOString() },
+        auth: { 
+          isLoggedIn: true, 
+          userEmail: session.user.email, 
+          lastLogin: new Date().toISOString() 
+        },
         profile: profileData ? {
           fullName: profileData.full_name || '',
           email: profileData.email || session.user.email,
@@ -121,7 +136,7 @@ const App: React.FC = () => {
         theme: profileData?.theme || prev.theme
       }));
     } catch (err) {
-      console.error("Erro ao carregar dados:", err);
+      console.error("Erro crítico ao sincronizar dados:", err);
     }
   };
 
@@ -130,8 +145,6 @@ const App: React.FC = () => {
     else document.documentElement.classList.remove('dark');
   }, [state.theme]);
 
-  // --- CRUD PERSISTENTE ---
-  
   const updateProfile = async (newProfile: UserProfile) => {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) return;
@@ -194,13 +207,7 @@ const App: React.FC = () => {
   const updateShopping = async (items: ShoppingItem[]) => {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) return;
-
-    // Identifica o que mudou (novo, deletado ou atualizado)
-    // Para simplificar, vamos sincronizar os estados e disparar atualizações
     setState(p => ({ ...p, shoppingList: items }));
-    
-    // Na prática, o ShoppingView chama updateShopping com a lista completa.
-    // Vamos garantir persistência das mudanças principais:
     const lastItem = items[0]; 
     if (lastItem && !state.shoppingList.find(i => i.id === lastItem.id)) {
       await supabase.from('shopping_items').insert([{
@@ -210,8 +217,6 @@ const App: React.FC = () => {
       }]);
     }
   };
-
-  // --- RENDER ---
 
   const navigateTo = (tab: TabId) => {
     setActiveTab(tab);
@@ -233,7 +238,7 @@ const App: React.FC = () => {
     return (
       <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col items-center justify-center gap-4">
         <Loader2 className="w-12 h-12 text-indigo-600 animate-spin" />
-        <p className="text-xs font-black text-slate-400 uppercase tracking-widest animate-pulse">Sincronizando Casa360...</p>
+        <p className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.2em] animate-pulse">Sincronizando Residência...</p>
       </div>
     );
   }
