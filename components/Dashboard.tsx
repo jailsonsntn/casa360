@@ -16,7 +16,7 @@ import {
   CloudLightning,
   Snowflake,
   MapPin,
-  RefreshCw
+  AlertCircle
 } from 'lucide-react';
 import { getWeatherInfo, WeatherData } from '../services/geminiService';
 
@@ -233,13 +233,5 @@ const Dashboard: React.FC<DashboardProps> = ({ state, onAction }) => {
     </div>
   );
 };
-
-const AlertCircle = ({ className }: { className?: string }) => (
-  <svg className={className} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><circle cx="12" cy="12" r="10"/><line x1="12" y1="8" x2="12" y2="12"/><line x1="12" y1="16" x2="12.01" y2="16"/></svg>
-);
-
-const ShoppingBag = ({ className }: { className?: string }) => (
-  <svg className={className} xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M6 2 3 6v14a2 2 0 0 0 2 2h14a2 2 0 0 0 2-2V6l-3-4Z"/><path d="M3 6h18"/><path d="M16 10a4 4 0 0 1-8 0"/></svg>
-);
 
 export default Dashboard;

@@ -1,7 +1,7 @@
 
 import React, { useState } from 'react';
 import { Task, RecurrenceType } from '../types';
-import { Plus, Search, Filter, Calendar, User, CheckCircle2, Circle, MoreVertical, X, CheckSquare } from 'lucide-react';
+import { Plus, Search, Calendar, User, CheckCircle2, Circle, MoreVertical, X, CheckSquare } from 'lucide-react';
 
 interface TasksViewProps {
   tasks: Task[];
@@ -35,7 +35,9 @@ const TasksView: React.FC<TasksViewProps> = ({ tasks, onAdd, onToggle }) => {
       responsible: resp || 'Residente',
       dueDate: date,
       recurrence,
-      status: 'pending'
+      status: 'pending',
+      priority: 'medium',
+      points: 20
     });
     setIsAdding(false);
     setTitle('');
