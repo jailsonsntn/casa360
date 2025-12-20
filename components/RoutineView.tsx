@@ -47,14 +47,12 @@ const RoutineView: React.FC<RoutineViewProps> = ({ tasks, onAdd, onUpdate, onDel
   const [priority, setPriority] = useState<PriorityLevel>('medium');
   const [alarmEnabled, setAlarmEnabled] = useState(false);
 
-  // Sistema de monitoramento de alarmes (Simulação de Trigger em tempo real)
   useEffect(() => {
     const interval = setInterval(() => {
       const now = new Date();
       tasks.forEach(task => {
         if (task.status === 'pending' && task.dueDate) {
           const taskDate = new Date(task.dueDate);
-          // Se a tarefa venceu no último minuto e tem alarme ou é prioridade alta
           const isDueNow = Math.abs(now.getTime() - taskDate.getTime()) < 60000;
           
           if (isDueNow && (task.alarmConfig?.enabled || task.priority === 'high')) {
@@ -67,7 +65,7 @@ const RoutineView: React.FC<RoutineViewProps> = ({ tasks, onAdd, onUpdate, onDel
           }
         }
       });
-    }, 60000); // Checa a cada minuto
+    }, 60000);
     return () => clearInterval(interval);
   }, [tasks]);
 
@@ -99,7 +97,7 @@ const RoutineView: React.FC<RoutineViewProps> = ({ tasks, onAdd, onUpdate, onDel
       title, description: desc, responsible: resp || 'Residente',
       dueDate: date, recurrence, status, priority,
       alarmConfig: { 
-        enabled: alarmEnabled || priority === 'high', // Alarme automático para alta prioridade
+        enabled: alarmEnabled || priority === 'high',
         sound: true, vibration: true, triggered: false 
       },
       points: priority === 'high' ? 50 : 20
@@ -129,9 +127,94 @@ const RoutineView: React.FC<RoutineViewProps> = ({ tasks, onAdd, onUpdate, onDel
     { id: 'completed', label: 'Pronto', color: 'bg-emerald-500' }
   ];
 
+  // Calendário Logic
+  const getDaysInMonth = (year: number, month: number) => new Date(year, month + 1, 0).getDate();
+  const getFirstDayOfMonth = (year: number, month: number) => new Date(year, month, 1).getDay();
+
+  const changeMonth = (offset: number) => {
+    const nextDate = new Date(currentDate);
+    nextDate.setMonth(currentDate.getMonth() + offset);
+    setCurrentDate(nextDate);
+  };
+
+  const renderCalendar = () => {
+    const year = currentDate.getFullYear();
+    const month = currentDate.getMonth();
+    const daysInMonth = getDaysInMonth(year, month);
+    const firstDay = getFirstDayOfMonth(year, month);
+    const prevMonthDays = getDaysInMonth(year, month - 1);
+
+    const days = [];
+    // Dias do mês anterior
+    for (let i = firstDay - 1; i >= 0; i--) {
+      days.push({ day: prevMonthDays - i, current: false, date: new Date(year, month - 1, prevMonthDays - i) });
+    }
+    // Dias do mês atual
+    for (let i = 1; i <= daysInMonth; i++) {
+      days.push({ day: i, current: true, date: new Date(year, month, i) });
+    }
+    // Dias do próximo mês para completar a grade
+    const remaining = 42 - days.length;
+    for (let i = 1; i <= remaining; i++) {
+      days.push({ day: i, current: false, date: new Date(year, month + 1, i) });
+    }
+
+    return (
+      <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] border border-slate-100 dark:border-slate-800 shadow-xl overflow-hidden animate-in fade-in zoom-in duration-500">
+        <div className="p-6 md:p-8 flex items-center justify-between border-b border-slate-50 dark:border-slate-800">
+          <h3 className="text-lg font-black text-slate-800 dark:text-white uppercase tracking-widest">
+            {currentDate.toLocaleDateString('pt-BR', { month: 'long', year: 'numeric' })}
+          </h3>
+          <div className="flex gap-2">
+            <button onClick={() => changeMonth(-1)} className="p-2 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-xl transition-all"><ChevronLeft size={20} /></button>
+            <button onClick={() => setCurrentDate(new Date())} className="px-4 py-2 text-[10px] font-black uppercase tracking-widest bg-indigo-50 dark:bg-indigo-900/30 text-indigo-600 dark:text-indigo-400 rounded-xl">Hoje</button>
+            <button onClick={() => changeMonth(1)} className="p-2 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-xl transition-all"><ChevronRight size={20} /></button>
+          </div>
+        </div>
+        <div className="grid grid-cols-7 border-b border-slate-50 dark:border-slate-800">
+          {['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'].map(d => (
+            <div key={d} className="py-4 text-center text-[10px] font-black text-slate-400 uppercase tracking-widest">{d}</div>
+          ))}
+        </div>
+        <div className="grid grid-cols-7">
+          {days.map((d, i) => {
+            const dateStr = d.date.toISOString().split('T')[0];
+            const dayTasks = tasks.filter(t => t.dueDate && t.dueDate.startsWith(dateStr));
+            const isToday = new Date().toISOString().split('T')[0] === dateStr;
+
+            return (
+              <div key={i} className={`min-h-[80px] md:min-h-[120px] p-2 border-r border-b border-slate-50 dark:border-slate-800 relative transition-all hover:bg-slate-50/50 dark:hover:bg-slate-800/20 ${!d.current ? 'opacity-30' : ''}`}>
+                <span className={`inline-flex items-center justify-center w-7 h-7 rounded-lg text-xs font-black ${isToday ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-200 dark:shadow-none' : 'text-slate-500 dark:text-slate-400'}`}>
+                  {d.day}
+                </span>
+                <div className="mt-2 space-y-1">
+                  {dayTasks.slice(0, 3).map(t => (
+                    <div 
+                      key={t.id} 
+                      onClick={() => setEditingTask(t)}
+                      className={`px-1.5 py-0.5 rounded text-[8px] font-black uppercase truncate cursor-pointer transition-all ${
+                        t.status === 'completed' ? 'bg-emerald-50 text-emerald-600 dark:bg-emerald-900/30' : 
+                        t.priority === 'high' ? 'bg-rose-50 text-rose-600 dark:bg-rose-900/30 border-l-2 border-rose-500' : 
+                        'bg-indigo-50 text-indigo-600 dark:bg-indigo-900/30'
+                      }`}
+                    >
+                      {t.title}
+                    </div>
+                  ))}
+                  {dayTasks.length > 3 && (
+                    <div className="text-[7px] font-black text-slate-400 pl-1 uppercase tracking-widest">+{dayTasks.length - 3} itens</div>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    );
+  };
+
   return (
     <div className="space-y-6 pb-10">
-      {/* Header Compacto */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div className="flex gap-1 p-1 bg-slate-100 dark:bg-slate-800 rounded-xl">
           <button onClick={() => setView('list')} className={`p-2 rounded-lg transition-all ${view === 'list' ? 'bg-white dark:bg-slate-700 text-indigo-600 shadow-sm' : 'text-slate-400'}`}><ListIcon size={18} /></button>
@@ -143,7 +226,6 @@ const RoutineView: React.FC<RoutineViewProps> = ({ tasks, onAdd, onUpdate, onDel
         </button>
       </div>
 
-      {/* Kanban Minimalista */}
       {view === 'kanban' && (
         <div className="flex flex-row overflow-x-auto gap-4 pb-6 no-scrollbar">
           {stages.map(stage => (
@@ -195,7 +277,8 @@ const RoutineView: React.FC<RoutineViewProps> = ({ tasks, onAdd, onUpdate, onDel
         </div>
       )}
 
-      {/* Lista e Calendário seguem a mesma lógica de compactação... */}
+      {view === 'calendar' && renderCalendar()}
+
       {view === 'list' && (
         <div className="space-y-2 max-w-3xl mx-auto">
           {tasks.map(task => (
@@ -218,7 +301,6 @@ const RoutineView: React.FC<RoutineViewProps> = ({ tasks, onAdd, onUpdate, onDel
         </div>
       )}
 
-      {/* Modal de Cadastro Minimalista */}
       {isAdding && (
         <div className="fixed inset-0 bg-slate-900/40 backdrop-blur-sm z-[110] flex items-center justify-center p-4">
           <div className="bg-white dark:bg-slate-900 w-full max-w-md rounded-2xl shadow-2xl animate-in zoom-in duration-200 overflow-hidden">

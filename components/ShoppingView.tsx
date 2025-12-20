@@ -7,7 +7,6 @@ import {
   Trash2, 
   Check, 
   Package, 
-  Filter, 
   X, 
   ShoppingCart, 
   Hammer, 
@@ -140,26 +139,13 @@ const ShoppingView: React.FC<ShoppingViewProps> = ({ items, onUpdate }) => {
     { id: 'pharmacy', label: 'Farmácia', icon: <PillIcon className="w-4 h-4" />, color: 'rose' },
   ];
 
-  const getSuggestions = () => {
-    switch(activeFilter) {
-      case 'market':
-        return [{ name: 'Arroz 5kg', cat: 'market' as const, list: 'Mensal' }, { name: 'Detergente', cat: 'market' as const, list: 'Limpeza' }];
-      case 'pharmacy':
-        return [{ name: 'Curativos', cat: 'pharmacy' as const, list: 'Emergência' }, { name: 'Antitermico', cat: 'pharmacy' as const, list: 'Emergência' }];
-      case 'maintenance':
-        return [{ name: 'Lâmpada LED', cat: 'maintenance' as const, list: 'Reparos' }, { name: 'Fita Isolante', cat: 'maintenance' as const, list: 'Reparos' }];
-      default:
-        return [{ name: 'Leite', cat: 'market' as const, list: 'Diário' }];
-    }
-  };
-
   const handleOpenAdd = () => {
     if (activeFilter !== 'all') setCat(activeFilter as ShoppingItem['category']);
     setIsAdding(true);
   };
 
   return (
-    <div className="space-y-6 md:space-y-10 animate-in fade-in duration-500 pb-20 max-w-full">
+    <div className="max-w-4xl mx-auto space-y-6 md:space-y-10 animate-in fade-in duration-500 pb-20 px-1">
       <div className="flex flex-col md:flex-row justify-between items-start md:items-center gap-6">
         <div>
           <h2 className="text-3xl font-black text-slate-800 dark:text-slate-100 tracking-tight">Compras & Estoque</h2>
@@ -173,9 +159,7 @@ const ShoppingView: React.FC<ShoppingViewProps> = ({ items, onUpdate }) => {
         </button>
       </div>
 
-      {/* Control Bar - Mobile Optimized */}
       <div className="space-y-4">
-        {/* Barra de Busca */}
         <div className="bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-2xl px-5 py-3.5 flex items-center gap-4 shadow-sm group focus-within:border-indigo-500 transition-all">
           <Search className="w-5 h-5 text-slate-300 dark:text-slate-600 group-focus-within:text-indigo-500" />
           <input 
@@ -187,7 +171,6 @@ const ShoppingView: React.FC<ShoppingViewProps> = ({ items, onUpdate }) => {
           />
         </div>
 
-        {/* Filtros com Máscara de Gradiente */}
         <div className="relative -mx-4">
           <div className="flex gap-2 overflow-x-auto no-scrollbar px-4 pb-2">
             {shortcuts.map(s => (
@@ -204,125 +187,95 @@ const ShoppingView: React.FC<ShoppingViewProps> = ({ items, onUpdate }) => {
               </button>
             ))}
           </div>
-          {/* Fading Edge Mask */}
           <div className="absolute top-0 right-0 h-full w-12 bg-gradient-to-l from-slate-50 dark:from-slate-950 pointer-events-none md:hidden"></div>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
-        <div className="lg:col-span-2 space-y-10">
-          {(Object.entries(groupedPending) as [string, ShoppingItem[]][]).map(([listTitle, groupItems]) => (
-            <div key={listTitle} className="space-y-5">
-              <div className="flex items-center justify-between px-2">
-                <div className="flex items-center gap-3 flex-1">
-                  <div className="w-10 h-10 bg-indigo-50 dark:bg-indigo-900/30 rounded-xl flex items-center justify-center shadow-sm border border-indigo-100/50 dark:border-indigo-800/30">
-                    <FolderOpen className="w-5 h-5 text-indigo-500" />
-                  </div>
-                  <div className="flex-1">
-                    {editingListName === listTitle ? (
-                      <div className="flex items-center gap-2">
-                        <input 
-                          autoFocus
-                          type="text"
-                          value={newListNameValue}
-                          onChange={(e) => setNewListNameValue(e.target.value)}
-                          className="bg-white dark:bg-slate-800 border-2 border-indigo-500 rounded-lg px-2 py-1 text-sm font-black text-slate-800 dark:text-white outline-none"
-                        />
-                        <button onClick={() => renameList(listTitle)} className="p-1.5 bg-indigo-600 text-white rounded-lg shadow-sm"><Save className="w-4 h-4" /></button>
-                      </div>
-                    ) : (
-                      <div className="flex items-center gap-2 group">
-                        <h3 className="font-black text-slate-800 dark:text-slate-100 text-sm uppercase tracking-widest">{listTitle}</h3>
-                        {listTitle !== 'Itens Soltos' && (
-                          <button 
-                            onClick={() => { setEditingListName(listTitle); setNewListNameValue(listTitle); }}
-                            className="p-1 text-slate-300 hover:text-indigo-600 transition-colors md:opacity-0 group-hover:opacity-100"
-                          >
-                            <Edit2 className="w-3.5 h-3.5" />
-                          </button>
-                        )}
-                      </div>
-                    )}
-                    <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500">{groupItems.length} {groupItems.length === 1 ? 'item' : 'itens'} pendentes</p>
-                  </div>
+      <div className="space-y-10">
+        {(Object.entries(groupedPending) as [string, ShoppingItem[]][]).map(([listTitle, groupItems]) => (
+          <div key={listTitle} className="space-y-5">
+            <div className="flex items-center justify-between px-2">
+              <div className="flex items-center gap-3 flex-1">
+                <div className="w-10 h-10 bg-indigo-50 dark:bg-indigo-900/30 rounded-xl flex items-center justify-center shadow-sm border border-indigo-100/50 dark:border-indigo-800/30">
+                  <FolderOpen className="w-5 h-5 text-indigo-500" />
                 </div>
-                <button 
-                  onClick={() => completeList(listTitle)}
-                  className="p-2 md:px-3 md:py-2 text-[10px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-widest hover:bg-emerald-50 dark:hover:bg-emerald-900/30 rounded-xl transition-colors active:scale-95"
-                >
-                  <CheckCheck className="w-5 h-5 md:hidden" />
-                  <span className="hidden md:inline">Marcar Tudo</span>
-                </button>
+                <div className="flex-1">
+                  {editingListName === listTitle ? (
+                    <div className="flex items-center gap-2">
+                      <input 
+                        autoFocus
+                        type="text"
+                        value={newListNameValue}
+                        onChange={(e) => setNewListNameValue(e.target.value)}
+                        className="bg-white dark:bg-slate-800 border-2 border-indigo-500 rounded-lg px-2 py-1 text-sm font-black text-slate-800 dark:text-white outline-none"
+                      />
+                      <button onClick={() => renameList(listTitle)} className="p-1.5 bg-indigo-600 text-white rounded-lg shadow-sm"><Save className="w-4 h-4" /></button>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-2 group">
+                      <h3 className="font-black text-slate-800 dark:text-slate-100 text-sm uppercase tracking-widest">{listTitle}</h3>
+                      {listTitle !== 'Itens Soltos' && (
+                        <button 
+                          onClick={() => { setEditingListName(listTitle); setNewListNameValue(listTitle); }}
+                          className="p-1 text-slate-300 hover:text-indigo-600 transition-colors md:opacity-0 group-hover:opacity-100"
+                        >
+                          <Edit2 className="w-3.5 h-3.5" />
+                        </button>
+                      )}
+                    </div>
+                  )}
+                  <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500">{groupItems.length} {groupItems.length === 1 ? 'item' : 'itens'} pendentes</p>
+                </div>
               </div>
+              <button 
+                onClick={() => completeList(listTitle)}
+                className="p-2 md:px-3 md:py-2 text-[10px] font-black text-emerald-600 dark:text-emerald-400 uppercase tracking-widest hover:bg-emerald-50 dark:hover:bg-emerald-900/30 rounded-xl transition-colors active:scale-95"
+              >
+                <CheckCheck className="w-5 h-5 md:hidden" />
+                <span className="hidden md:inline">Marcar Tudo</span>
+              </button>
+            </div>
 
-              <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] border border-slate-100 dark:border-slate-800 shadow-sm overflow-hidden divide-y divide-slate-50 dark:divide-slate-800">
-                {groupItems.map((item) => (
-                  <div key={item.id} className="p-5 md:p-6 flex items-center justify-between group hover:bg-slate-50/50 dark:hover:bg-slate-800/50 transition-all">
-                    <div className="flex items-center gap-4 md:gap-6 flex-1 min-w-0">
-                      <button 
-                        onClick={() => togglePurchased(item.id)} 
-                        className="w-10 h-10 md:w-12 h-12 rounded-2xl border-2 flex items-center justify-center transition-all bg-white dark:bg-slate-800 border-slate-100 dark:border-slate-800 hover:border-emerald-200 active:scale-90"
-                      >
-                        <Check className="w-5 h-5 md:w-6 h-6 opacity-0 group-hover:opacity-100 transition-opacity text-emerald-500" />
-                      </button>
-                      <div className="min-w-0 truncate">
-                        <p className="font-black text-slate-800 dark:text-slate-100 text-base md:text-lg leading-tight truncate">{item.name}</p>
-                        <div className="flex items-center gap-2 mt-1.5">
-                          <span className={`text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md ${categories[item.category].color}`}>
-                            {categories[item.category].label}
-                          </span>
-                        </div>
+            <div className="bg-white dark:bg-slate-900 rounded-[2.5rem] border border-slate-100 dark:border-slate-800 shadow-sm overflow-hidden divide-y divide-slate-50 dark:divide-slate-800">
+              {groupItems.map((item) => (
+                <div key={item.id} className="p-5 md:p-6 flex items-center justify-between group hover:bg-slate-50/50 dark:hover:bg-slate-800/50 transition-all">
+                  <div className="flex items-center gap-4 md:gap-6 flex-1 min-w-0">
+                    <button 
+                      onClick={() => togglePurchased(item.id)} 
+                      className="w-10 h-10 md:w-12 h-12 rounded-2xl border-2 flex items-center justify-center transition-all bg-white dark:bg-slate-800 border-slate-100 dark:border-slate-800 hover:border-emerald-200 active:scale-90"
+                    >
+                      <Check className="w-5 h-5 md:w-6 h-6 opacity-0 group-hover:opacity-100 transition-opacity text-emerald-500" />
+                    </button>
+                    <div className="min-w-0 truncate">
+                      <p className="font-black text-slate-800 dark:text-slate-100 text-base md:text-lg leading-tight truncate">{item.name}</p>
+                      <div className="flex items-center gap-2 mt-1.5">
+                        <span className={`text-[8px] font-black uppercase tracking-widest px-2 py-0.5 rounded-md ${categories[item.category].color}`}>
+                          {categories[item.category].label}
+                        </span>
                       </div>
                     </div>
-                    <button 
-                      onClick={() => setItemToDelete(item)} 
-                      className="p-3 bg-slate-50 dark:bg-slate-800 rounded-xl text-slate-300 hover:text-rose-500 transition-all"
-                    >
-                      <Trash2 className="w-4 h-4 md:w-5 h-5" />
-                    </button>
                   </div>
-                ))}
-              </div>
+                  <button 
+                    onClick={() => setItemToDelete(item)} 
+                    className="p-3 bg-slate-50 dark:bg-slate-800 rounded-xl text-slate-300 hover:text-rose-500 transition-all"
+                  >
+                    <Trash2 className="w-4 h-4 md:w-5 h-5" />
+                  </button>
+                </div>
+              ))}
             </div>
-          ))}
+          </div>
+        ))}
 
-          {pendingItems.length === 0 && (
-            <div className="p-20 text-center bg-white dark:bg-slate-900 rounded-[3.5rem] border border-slate-100 dark:border-slate-800">
-              <div className="w-20 h-20 bg-slate-50 dark:bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-6">
-                <ShoppingBasket className="w-10 h-10 text-slate-200 dark:text-slate-700" />
-              </div>
-              <h4 className="text-xl font-black text-slate-800 dark:text-white">Tudo abastecido!</h4>
-              <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 mt-2">Nenhum item pendente no filtro atual.</p>
+        {pendingItems.length === 0 && (
+          <div className="p-20 text-center bg-white dark:bg-slate-900 rounded-[3.5rem] border border-slate-100 dark:border-slate-800">
+            <div className="w-20 h-20 bg-slate-50 dark:bg-slate-800 rounded-full flex items-center justify-center mx-auto mb-6">
+              <ShoppingBasket className="w-10 h-10 text-slate-200 dark:text-slate-700" />
             </div>
-          )}
-        </div>
-
-        <div className="space-y-6">
-           <section className={`rounded-[3rem] p-8 text-white shadow-xl relative overflow-hidden transition-all duration-700 ${
-             activeFilter === 'maintenance' ? 'bg-amber-500' : 
-             activeFilter === 'market' ? 'bg-emerald-600' :
-             activeFilter === 'pharmacy' ? 'bg-rose-500' :
-             'bg-indigo-600'
-           }`}>
-              <div className="absolute top-0 right-0 p-8 opacity-20"><Plus className="w-12 h-12" /></div>
-              <h3 className="font-black text-2xl leading-tight">Sugestões para<br/>Abastecer</h3>
-              <div className="mt-8 space-y-3 relative z-10">
-                 {getSuggestions().map((sug, idx) => (
-                    <div 
-                      key={idx} 
-                      onClick={() => addItem(undefined, sug.name, sug.cat, sug.list)}
-                      className="bg-white/10 p-4 rounded-2xl border border-white/10 flex items-center justify-between group cursor-pointer hover:bg-white/20 transition-all active:scale-95"
-                    >
-                       <div className="flex flex-col">
-                          <span className="text-sm font-bold">{sug.name}</span>
-                          <span className="text-[8px] opacity-60 uppercase font-black">{sug.list}</span>
-                       </div>
-                       <ChevronRight className="w-4 h-4 group-hover:translate-x-1 transition-transform" />
-                    </div>
-                 ))}
-              </div>
-           </section>
-        </div>
+            <h4 className="text-xl font-black text-slate-800 dark:text-white">Tudo abastecido!</h4>
+            <p className="text-[10px] font-black uppercase tracking-widest text-slate-400 dark:text-slate-500 mt-2">Nenhum item pendente no filtro atual.</p>
+          </div>
+        )}
       </div>
 
       {isAdding && (
@@ -398,7 +351,6 @@ const ShoppingView: React.FC<ShoppingViewProps> = ({ items, onUpdate }) => {
         </div>
       )}
 
-      {/* Confirmation Modal for Deletion */}
       {itemToDelete && (
         <div className="fixed inset-0 bg-slate-900/60 backdrop-blur-xl z-[120] flex items-center justify-center p-4">
            <div className="bg-white dark:bg-slate-900 w-full max-w-sm rounded-[3rem] p-10 shadow-2xl animate-in zoom-in duration-200 border border-white/20">
