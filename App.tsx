@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { 
   LayoutDashboard, 
   Wallet, 
@@ -61,49 +61,15 @@ const App: React.FC = () => {
   const [loadingSession, setLoadingSession] = useState(true);
   const [state, setState] = useState<HomeState>(INITIAL_STATE);
 
-  useEffect(() => {
-    let mounted = true;
-
-    const init = async () => {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (mounted) {
-        if (session) {
-          await handleAuthChange(session);
-        }
-        setLoadingSession(false);
-      }
-    };
-
-    init();
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      if (!mounted) return;
-      
-      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
-        await handleAuthChange(session);
-        setLoadingSession(false);
-      } else if (event === 'SIGNED_OUT') {
-        setState(INITIAL_STATE);
-        setLoadingSession(false);
-      }
-    });
-
-    return () => {
-      mounted = false;
-      subscription.unsubscribe();
-    };
-  }, []);
-
-  const handleAuthChange = async (session: any) => {
-    if (!session) return;
-
+  const fetchUserData = useCallback(async (userId: string, email: string) => {
     try {
-      // Usando consultas individuais para evitar que uma falha trave tudo (Promise.allSettled seria outra opção)
-      const pRes = await supabase.from('profiles').select('*').eq('id', session.user.id).maybeSingle();
-      const tRes = await supabase.from('tasks').select('*').eq('user_id', session.user.id).order('created_at', { ascending: false });
-      const fRes = await supabase.from('finance').select('*').eq('user_id', session.user.id).order('created_at', { ascending: false });
-      const mRes = await supabase.from('medications').select('*').eq('user_id', session.user.id);
-      const sRes = await supabase.from('shopping_items').select('*').eq('user_id', session.user.id);
+      const [pRes, tRes, fRes, mRes, sRes] = await Promise.all([
+        supabase.from('profiles').select('*').eq('id', userId).maybeSingle(),
+        supabase.from('tasks').select('*').eq('user_id', userId).order('created_at', { ascending: false }),
+        supabase.from('finance').select('*').eq('user_id', userId).order('created_at', { ascending: false }),
+        supabase.from('medications').select('*').eq('user_id', userId),
+        supabase.from('shopping_items').select('*').eq('user_id', userId)
+      ]);
 
       const profileData = pRes.data;
       
@@ -111,12 +77,12 @@ const App: React.FC = () => {
         ...prev,
         auth: { 
           isLoggedIn: true, 
-          userEmail: session.user.email, 
+          userEmail: email, 
           lastLogin: new Date().toISOString() 
         },
         profile: profileData ? {
           fullName: profileData.full_name || '',
-          email: profileData.email || session.user.email,
+          email: profileData.email || email,
           birthDate: profileData.birth_date || '',
           phone: profileData.phone || '',
           houseName: profileData.house_name || 'Minha Casa',
@@ -128,7 +94,7 @@ const App: React.FC = () => {
             state: profileData.address_state || '',
             zip: profileData.address_zip || '',
           }
-        } : { ...INITIAL_PROFILE, email: session.user.email },
+        } : { ...INITIAL_PROFILE, email: email },
         tasks: tRes.data || [],
         finance: fRes.data || [],
         medications: mRes.data || [],
@@ -136,9 +102,51 @@ const App: React.FC = () => {
         theme: profileData?.theme || prev.theme
       }));
     } catch (err) {
-      console.error("Erro crítico ao sincronizar dados:", err);
+      console.error("Erro ao sincronizar dados do usuário:", err);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    let mounted = true;
+
+    const initializeAuth = async () => {
+      try {
+        const { data: { session } } = await supabase.auth.getSession();
+        
+        if (mounted) {
+          if (session?.user) {
+            await fetchUserData(session.user.id, session.user.email!);
+          }
+        }
+      } catch (err) {
+        console.error("Erro na inicialização da sessão:", err);
+      } finally {
+        if (mounted) setLoadingSession(false);
+      }
+    };
+
+    initializeAuth();
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+      if (!mounted) return;
+
+      if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+        if (session?.user) {
+          // Se já carregamos os dados no initializeAuth, o fetchUserData aqui apenas garante consistência
+          await fetchUserData(session.user.id, session.user.email!);
+          setLoadingSession(false);
+        }
+      } else if (event === 'SIGNED_OUT') {
+        setState(INITIAL_STATE);
+        setLoadingSession(false);
+      }
+    });
+
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
+  }, [fetchUserData]);
 
   useEffect(() => {
     if (state.theme === 'dark') document.documentElement.classList.add('dark');
@@ -236,9 +244,15 @@ const App: React.FC = () => {
 
   if (loadingSession) {
     return (
-      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col items-center justify-center gap-4">
-        <Loader2 className="w-12 h-12 text-indigo-600 animate-spin" />
-        <p className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-[0.2em] animate-pulse">Sincronizando Residência...</p>
+      <div className="fixed inset-0 bg-slate-50 dark:bg-slate-950 flex flex-col items-center justify-center gap-6 z-[200]">
+        <div className="relative">
+          <div className="w-16 h-16 border-4 border-indigo-100 dark:border-slate-800 rounded-full animate-pulse"></div>
+          <Loader2 className="w-16 h-16 text-indigo-600 dark:text-indigo-400 animate-spin absolute top-0 left-0" />
+        </div>
+        <div className="text-center">
+          <p className="text-[11px] font-black text-slate-800 dark:text-slate-200 uppercase tracking-[0.3em] animate-pulse">Sincronizando Residência</p>
+          <p className="text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mt-2">Casa360 Cloud Sync</p>
+        </div>
       </div>
     );
   }
