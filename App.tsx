@@ -76,11 +76,12 @@ const App: React.FC = () => {
         supabase.from('shopping_items').select('*').eq('user_id', userId)
       ]);
 
-      const profileData = results[0].status === 'fulfilled' ? (results[0].value as any).data : null;
-      const tasksRaw = results[1].status === 'fulfilled' ? (results[1].value as any).data : [];
-      const financeRaw = results[2].status === 'fulfilled' ? (results[2].value as any).data : [];
-      const medsRaw = results[3].status === 'fulfilled' ? (results[3].value as any).data : [];
-      const shoppingRaw = results[4].status === 'fulfilled' ? (results[4].value as any).data : [];
+      // Extração segura dos dados para evitar quebra de script
+      const profileData = results[0].status === 'fulfilled' && (results[0].value as any)?.data ? (results[0].value as any).data : null;
+      const tasksRaw = results[1].status === 'fulfilled' && (results[1].value as any)?.data ? (results[1].value as any).data : [];
+      const financeRaw = results[2].status === 'fulfilled' && (results[2].value as any)?.data ? (results[2].value as any).data : [];
+      const medsRaw = results[3].status === 'fulfilled' && (results[3].value as any)?.data ? (results[3].value as any).data : [];
+      const shoppingRaw = results[4].status === 'fulfilled' && (results[4].value as any)?.data ? (results[4].value as any).data : [];
       
       const tasks: Task[] = (tasksRaw || []).map((t: any) => ({
         ...t,
@@ -141,9 +142,13 @@ const App: React.FC = () => {
       }));
     } catch (err) {
       console.error("Erro fatal no fetchUserData:", err);
+    } finally {
+      // Garante que o loading pare mesmo se houver erro
+      setLoadingSession(false);
     }
   }, []);
 
+  // Inactivity Management
   const resetIdleTimers = useCallback(() => {
     if (idleTimeoutRef.current) clearTimeout(idleTimeoutRef.current);
     if (!state.auth.isLoggedIn || showIdleModal) return;
@@ -189,11 +194,15 @@ const App: React.FC = () => {
       try {
         const { data: { session }, error } = await supabase.auth.getSession();
         if (mounted) {
-          if (session?.user) await fetchUserData(session.user.id, session.user.email!);
-          else setState(prev => ({ ...prev, auth: { ...prev.auth, isLoggedIn: false } }));
-          setLoadingSession(false);
+          if (session?.user) {
+            await fetchUserData(session.user.id, session.user.email!);
+          } else {
+            setState(prev => ({ ...prev, auth: { ...prev.auth, isLoggedIn: false } }));
+            setLoadingSession(false);
+          }
         }
       } catch (e) {
+        console.error("Erro ao verificar sessão:", e);
         if (mounted) setLoadingSession(false);
       }
     };
@@ -204,7 +213,6 @@ const App: React.FC = () => {
       if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
         if (session?.user) {
           await fetchUserData(session.user.id, session.user.email!);
-          setLoadingSession(false);
         }
       } else if (event === 'SIGNED_OUT') {
         setState(INITIAL_STATE);
@@ -398,7 +406,7 @@ const App: React.FC = () => {
 
       {showIdleModal && (
         <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-[250] flex items-center justify-center p-4">
-           <div className="bg-white dark:bg-slate-900 w-full max-w-sm rounded-[3rem] p-10 shadow-2xl animate-in zoom-in duration-300 border border-white/20 text-center">
+           <div className="bg-white dark:bg-slate-900 w-full max-sm rounded-[3rem] p-10 shadow-2xl animate-in zoom-in duration-300 border border-white/20 text-center">
               <div className="w-20 h-20 bg-amber-50 dark:bg-amber-900/30 text-amber-500 rounded-[1.5rem] flex items-center justify-center mx-auto mb-6">
                  <Clock className="w-10 h-10 animate-pulse" />
               </div>
