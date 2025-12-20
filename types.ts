@@ -6,6 +6,15 @@ export type TransactionType = 'expense' | 'income';
 export type PaymentMethod = 'credit_card' | 'debit_card' | 'cash' | 'transfer' | 'pix';
 export type TransactionClassification = 'fixed' | 'variable' | 'recurring';
 
+// Added TimelineEvent type to fix compilation error in components/TimelineView.tsx
+export interface TimelineEvent {
+  id: string;
+  date: string;
+  eventType: 'task' | 'income' | 'expense' | 'reminder';
+  title: string;
+  description: string;
+}
+
 export interface UserProfile {
   fullName: string;
   birthDate: string;
@@ -25,6 +34,7 @@ export interface UserProfile {
 export interface AuthState {
   isLoggedIn: boolean;
   userEmail: string | null;
+  userId: string | null;
   lastLogin: string | null;
 }
 
@@ -94,22 +104,12 @@ export interface Reminder {
   title: string;
 }
 
-export interface TimelineEvent {
-  id: string;
-  eventType: 'task' | 'expense' | 'income' | 'reminder' | 'health';
-  referenceId: string;
-  title: string;
-  description: string;
-  date: string;
-}
-
 export interface HomeState {
   auth: AuthState;
   profile: UserProfile;
   tasks: Task[];
   finance: Transaction[];
   reminders: Reminder[];
-  timeline: TimelineEvent[];
   medications: Medication[];
   shoppingList: ShoppingItem[];
   userPoints: number;

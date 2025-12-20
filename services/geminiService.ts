@@ -2,14 +2,19 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { Task, Transaction } from "../types";
 
-// Proteção para evitar crash se process.env não estiver pronto
-const getApiKey = () => (typeof process !== 'undefined' && process.env?.API_KEY) || '';
+export interface WeatherData {
+  temp: string;
+  condition: 'sunny' | 'cloudy' | 'rainy' | 'storm' | 'snow';
+  description: string;
+  advice: string;
+  // Added sources field to hold grounding chunks (URLs) from Google Search
+  sources?: { title: string; uri: string }[];
+}
 
 export const getHomeInsights = async (tasks: Task[], transactions: Transaction[]) => {
-  const apiKey = getApiKey();
-  if (!apiKey) return { spendingInsights: "Configuração pendente.", maintenanceSuggestions: "API Key não encontrada." };
+  // Always use process.env.API_KEY directly as a named parameter in the constructor
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
   
-  const ai = new GoogleGenAI({ apiKey });
   const prompt = `
     You are an expert home management consultant. 
     Analyze the following home data and provide concise, actionable insights for the user.
@@ -39,6 +44,7 @@ export const getHomeInsights = async (tasks: Task[], transactions: Transaction[]
       },
     });
 
+    // Directly access the text property as a string (not a method)
     const jsonStr = response.text?.trim() || '{}';
     return JSON.parse(jsonStr);
   } catch (error) {
@@ -50,19 +56,11 @@ export const getHomeInsights = async (tasks: Task[], transactions: Transaction[]
   }
 };
 
-export interface WeatherData {
-  temp: string;
-  condition: 'sunny' | 'cloudy' | 'rainy' | 'storm' | 'snow';
-  description: string;
-  advice: string;
-}
-
 export const getWeatherInfo = async (city: string, state: string): Promise<WeatherData | null> => {
   if (!city || !state) return null;
-  const apiKey = getApiKey();
-  if (!apiKey) return null;
+  // Always use process.env.API_KEY directly as a named parameter in the constructor
+  const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
-  const ai = new GoogleGenAI({ apiKey });
   const prompt = `Consulte o clima atual para a localização: ${city}, ${state}. 
   Retorne um JSON com:
   1. temp: a temperatura atual em Celsius (ex: "26°C").
@@ -90,8 +88,18 @@ export const getWeatherInfo = async (city: string, state: string): Promise<Weath
       },
     });
 
+    // Directly access the text property as a string (not a method)
     const jsonStr = response.text?.trim() || '{}';
-    return JSON.parse(jsonStr);
+    const data = JSON.parse(jsonStr);
+
+    // Extract grounding chunks (URLs) from Google Search tool as required by guidelines
+    const groundingChunks = response.candidates?.[0]?.groundingMetadata?.groundingChunks;
+    const sources = groundingChunks?.map((chunk: any) => ({
+      title: chunk.web?.title || 'Fonte de pesquisa',
+      uri: chunk.web?.uri
+    })).filter((s: any) => s.uri) || [];
+
+    return { ...data, sources };
   } catch (error) {
     console.error("Weather Gemini Error:", error);
     return null;
