@@ -12,7 +12,8 @@ import {
   User,
   AlertCircle,
   Loader2,
-  CheckCircle2
+  CheckCircle2,
+  Inbox
 } from 'lucide-react';
 import { supabase } from '../services/supabaseClient';
 
@@ -28,7 +29,7 @@ const AuthView: React.FC<AuthViewProps> = ({ onLogin }) => {
   const [fullName, setFullName] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
-  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const [successMode, setSuccessMode] = useState(false);
 
   const slides = [
     {
@@ -60,7 +61,6 @@ const AuthView: React.FC<AuthViewProps> = ({ onLogin }) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
-    setSuccessMessage(null);
 
     try {
       if (mode === 'signup') {
@@ -76,10 +76,8 @@ const AuthView: React.FC<AuthViewProps> = ({ onLogin }) => {
         
         if (signUpError) throw signUpError;
 
-        // Se o cadastro foi bem sucedido mas precisa de confirmação
-        setSuccessMessage("Conta criada! Verifique seu e-mail para confirmar seu cadastro.");
-        setMode('login');
-        setPassword(''); // Limpa senha por segurança
+        // Ativa o modo de sucesso para confirmação de e-mail
+        setSuccessMode(true);
       } else {
         const { data, error: signInError } = await supabase.auth.signInWithPassword({
           email,
@@ -89,11 +87,41 @@ const AuthView: React.FC<AuthViewProps> = ({ onLogin }) => {
       }
     } catch (err: any) {
       console.error("Erro na autenticação:", err);
-      setError(err.message || 'Ocorreu um erro na autenticação. Verifique os dados e tente novamente.');
+      setError(err.message || 'Ocorreu um erro. Verifique seus dados.');
     } finally {
       setLoading(false);
     }
   };
+
+  if (successMode) {
+    return (
+      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col items-center justify-center p-6 transition-colors duration-500">
+        <div className="w-full max-w-md bg-white dark:bg-slate-900 rounded-[3.5rem] shadow-2xl p-10 text-center space-y-8 animate-in zoom-in duration-500 border border-slate-100 dark:border-slate-800">
+          <div className="w-20 h-20 bg-emerald-100 dark:bg-emerald-900/30 text-emerald-600 dark:text-emerald-400 rounded-3xl flex items-center justify-center mx-auto shadow-lg">
+            <Inbox className="w-10 h-10 animate-bounce" />
+          </div>
+          <div className="space-y-3">
+            <h2 className="text-2xl font-black text-slate-800 dark:text-white">Confirme seu E-mail</h2>
+            <p className="text-sm text-slate-500 dark:text-slate-400 leading-relaxed">
+              Enviamos um link de confirmação para <span className="font-black text-indigo-600">{email}</span>.
+            </p>
+            <div className="p-4 bg-indigo-50 dark:bg-indigo-900/20 rounded-2xl border border-indigo-100 dark:border-indigo-800 mt-4">
+              <p className="text-[10px] font-black text-indigo-600 dark:text-indigo-400 uppercase tracking-widest">Observação Importante</p>
+              <p className="text-xs text-slate-600 dark:text-slate-300 mt-2 font-medium">
+                Você precisa clicar no link do e-mail antes de conseguir fazer o login no Casa360.
+              </p>
+            </div>
+          </div>
+          <button 
+            onClick={() => { setSuccessMode(false); setMode('login'); setPassword(''); }}
+            className="w-full bg-slate-900 dark:bg-indigo-600 text-white py-5 rounded-2xl font-black text-sm flex items-center justify-center gap-3 hover:scale-[1.02] active:scale-95 transition-all shadow-xl"
+          >
+            Voltar para Login
+          </button>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col items-center justify-center p-6 transition-colors duration-500">
@@ -143,12 +171,6 @@ const AuthView: React.FC<AuthViewProps> = ({ onLogin }) => {
             {error && (
               <div className="bg-rose-50 dark:bg-rose-900/20 p-4 rounded-xl border border-rose-100 dark:border-rose-800 flex items-center gap-3 text-rose-600 dark:text-rose-400 text-xs font-bold animate-in shake duration-300">
                 <AlertCircle className="w-4 h-4 shrink-0" /> {error}
-              </div>
-            )}
-
-            {successMessage && (
-              <div className="bg-emerald-50 dark:bg-emerald-900/20 p-4 rounded-xl border border-emerald-100 dark:border-emerald-800 flex items-center gap-3 text-emerald-600 dark:text-emerald-400 text-xs font-bold animate-in slide-in-from-top duration-300">
-                <CheckCircle2 className="w-4 h-4 shrink-0" /> {successMessage}
               </div>
             )}
 
@@ -215,7 +237,6 @@ const AuthView: React.FC<AuthViewProps> = ({ onLogin }) => {
                 onClick={() => {
                   setMode(mode === 'login' ? 'signup' : 'login');
                   setError(null);
-                  setSuccessMessage(null);
                 }}
                 className="text-[10px] font-black text-slate-400 hover:text-indigo-600 uppercase tracking-widest transition-colors"
               >
@@ -226,7 +247,7 @@ const AuthView: React.FC<AuthViewProps> = ({ onLogin }) => {
         )}
       </div>
       
-      <p className="mt-8 text-[10px] font-bold text-slate-400 dark:text-slate-600 uppercase tracking-[0.2em]">Versão 2.2 • Produção Vercel</p>
+      <p className="mt-8 text-[10px] font-bold text-slate-400 dark:text-slate-600 uppercase tracking-[0.2em]">Versão 2.3 • Produção Estável</p>
     </div>
   );
 };
