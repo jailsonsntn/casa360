@@ -63,7 +63,8 @@ const App: React.FC = () => {
 
   const fetchUserData = useCallback(async (userId: string, email: string) => {
     try {
-      const [pRes, tRes, fRes, mRes, sRes] = await Promise.all([
+      // Usamos consultas individuais com tratamento de erro para evitar que uma tabela faltante trave o app
+      const [pRes, tRes, fRes, mRes, sRes] = await Promise.allSettled([
         supabase.from('profiles').select('*').eq('id', userId).maybeSingle(),
         supabase.from('tasks').select('*').eq('user_id', userId).order('created_at', { ascending: false }),
         supabase.from('finance').select('*').eq('user_id', userId).order('created_at', { ascending: false }),
@@ -71,7 +72,11 @@ const App: React.FC = () => {
         supabase.from('shopping_items').select('*').eq('user_id', userId)
       ]);
 
-      const profileData = pRes.data;
+      const profileData = pRes.status === 'fulfilled' ? pRes.value.data : null;
+      const tasks = tRes.status === 'fulfilled' ? tRes.value.data : [];
+      const finance = fRes.status === 'fulfilled' ? fRes.value.data : [];
+      const meds = mRes.status === 'fulfilled' ? mRes.value.data : [];
+      const shopping = sRes.status === 'fulfilled' ? sRes.value.data : [];
       
       setState(prev => ({
         ...prev,
@@ -95,21 +100,21 @@ const App: React.FC = () => {
             zip: profileData.address_zip || '',
           }
         } : { ...INITIAL_PROFILE, email: email },
-        tasks: tRes.data || [],
-        finance: fRes.data || [],
-        medications: mRes.data || [],
-        shoppingList: sRes.data || [],
+        tasks: tasks || [],
+        finance: finance || [],
+        medications: meds || [],
+        shoppingList: shopping || [],
         theme: profileData?.theme || prev.theme
       }));
     } catch (err) {
-      console.error("Erro ao sincronizar dados do usuário:", err);
+      console.error("Erro crítico ao sincronizar dados:", err);
     }
   }, []);
 
   useEffect(() => {
     let mounted = true;
 
-    const initializeAuth = async () => {
+    const initialize = async () => {
       try {
         const { data: { session } } = await supabase.auth.getSession();
         
@@ -119,20 +124,19 @@ const App: React.FC = () => {
           }
         }
       } catch (err) {
-        console.error("Erro na inicialização da sessão:", err);
+        console.error("Erro na inicialização:", err);
       } finally {
         if (mounted) setLoadingSession(false);
       }
     };
 
-    initializeAuth();
+    initialize();
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (!mounted) return;
 
       if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
         if (session?.user) {
-          // Se já carregamos os dados no initializeAuth, o fetchUserData aqui apenas garante consistência
           await fetchUserData(session.user.id, session.user.email!);
           setLoadingSession(false);
         }
@@ -152,6 +156,8 @@ const App: React.FC = () => {
     if (state.theme === 'dark') document.documentElement.classList.add('dark');
     else document.documentElement.classList.remove('dark');
   }, [state.theme]);
+
+  // --- CRUD PERSISTENTE ---
 
   const updateProfile = async (newProfile: UserProfile) => {
     const { data: { session } } = await supabase.auth.getSession();
@@ -215,14 +221,37 @@ const App: React.FC = () => {
   const updateShopping = async (items: ShoppingItem[]) => {
     const { data: { session } } = await supabase.auth.getSession();
     if (!session) return;
+
+    // Atualiza localmente imediatamente para UI fluida
     setState(p => ({ ...p, shoppingList: items }));
+
+    // Sincroniza com o banco o item mais recente (se for novo)
     const lastItem = items[0]; 
-    if (lastItem && !state.shoppingList.find(i => i.id === lastItem.id)) {
-      await supabase.from('shopping_items').insert([{
+    if (lastItem && typeof lastItem.id === 'string' && lastItem.id.length < 15) { // ID gerado pelo cliente
+      const { data, error } = await supabase.from('shopping_items').insert([{
         user_id: session.user.id,
-        name: lastItem.name, category: lastItem.category, 
-        list_name: lastItem.listName, is_purchased: lastItem.isPurchased
-      }]);
+        name: lastItem.name, 
+        category: lastItem.category, 
+        list_name: lastItem.listName, 
+        is_purchased: lastItem.isPurchased
+      }]).select().single();
+      
+      if (data) {
+        setState(p => ({
+          ...p,
+          shoppingList: p.shoppingList.map(i => i.id === lastItem.id ? data : i)
+        }));
+      }
+    } else {
+      // Para itens existentes, atualiza o status de compra
+      for (const item of items) {
+        if (item.id.length > 15) { // ID uuid do supabase
+          await supabase.from('shopping_items').update({ 
+            is_purchased: item.isPurchased,
+            list_name: item.listName 
+          }).eq('id', item.id);
+        }
+      }
     }
   };
 
@@ -246,12 +275,12 @@ const App: React.FC = () => {
     return (
       <div className="fixed inset-0 bg-slate-50 dark:bg-slate-950 flex flex-col items-center justify-center gap-6 z-[200]">
         <div className="relative">
-          <div className="w-16 h-16 border-4 border-indigo-100 dark:border-slate-800 rounded-full animate-pulse"></div>
-          <Loader2 className="w-16 h-16 text-indigo-600 dark:text-indigo-400 animate-spin absolute top-0 left-0" />
+          <div className="w-20 h-20 border-4 border-indigo-100 dark:border-slate-800 rounded-full animate-pulse"></div>
+          <Loader2 className="w-20 h-20 text-indigo-600 dark:text-indigo-400 animate-spin absolute top-0 left-0" />
         </div>
         <div className="text-center">
-          <p className="text-[11px] font-black text-slate-800 dark:text-slate-200 uppercase tracking-[0.3em] animate-pulse">Sincronizando Residência</p>
-          <p className="text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mt-2">Casa360 Cloud Sync</p>
+          <p className="text-[12px] font-black text-slate-800 dark:text-slate-200 uppercase tracking-[0.4em] animate-pulse">Sincronizando Residência</p>
+          <p className="text-[10px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest mt-2">Casa360 Cloud Sync</p>
         </div>
       </div>
     );
