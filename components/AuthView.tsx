@@ -4,16 +4,17 @@ import {
   Sparkles, 
   ArrowRight, 
   LayoutDashboard, 
-  Wallet, 
   HeartPulse, 
-  CheckCircle, 
   UserPlus, 
   LogIn,
   Mail,
   Lock,
-  ChevronRight,
-  ChevronLeft
+  User,
+  AlertCircle,
+  Loader2,
+  CheckCircle2
 } from 'lucide-react';
+import { supabase } from '../services/supabaseClient';
 
 interface AuthViewProps {
   onLogin: (email: string, isNew?: boolean) => void;
@@ -24,6 +25,10 @@ const AuthView: React.FC<AuthViewProps> = ({ onLogin }) => {
   const [slide, setSlide] = useState(0);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
+  const [fullName, setFullName] = useState('');
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   const slides = [
     {
@@ -51,16 +56,48 @@ const AuthView: React.FC<AuthViewProps> = ({ onLogin }) => {
     else setMode('login');
   };
 
-  const handleAuth = (e: React.FormEvent) => {
+  const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (email && password) {
-      onLogin(email, mode === 'signup');
+    setLoading(true);
+    setError(null);
+    setSuccessMessage(null);
+
+    try {
+      if (mode === 'signup') {
+        const { data, error: signUpError } = await supabase.auth.signUp({
+          email,
+          password,
+          options: {
+            data: {
+              full_name: fullName,
+            }
+          }
+        });
+        
+        if (signUpError) throw signUpError;
+
+        // Se o cadastro foi bem sucedido mas precisa de confirmação
+        setSuccessMessage("Conta criada! Verifique seu e-mail para confirmar seu cadastro.");
+        setMode('login');
+        setPassword(''); // Limpa senha por segurança
+      } else {
+        const { data, error: signInError } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
+        if (signInError) throw signInError;
+      }
+    } catch (err: any) {
+      console.error("Erro na autenticação:", err);
+      setError(err.message || 'Ocorreu um erro na autenticação. Verifique os dados e tente novamente.');
+    } finally {
+      setLoading(false);
     }
   };
 
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex flex-col items-center justify-center p-6 transition-colors duration-500">
-      <div className="w-full max-w-md bg-white dark:bg-slate-900 rounded-[3rem] shadow-2xl overflow-hidden border border-slate-100 dark:border-slate-800 animate-in fade-in zoom-in duration-500">
+      <div className="w-full max-w-md bg-white dark:bg-slate-900 rounded-[3.5rem] shadow-2xl overflow-hidden border border-slate-100 dark:border-slate-800 animate-in fade-in zoom-in duration-500">
         
         {mode === 'intro' && (
           <div className="flex flex-col h-full">
@@ -103,7 +140,36 @@ const AuthView: React.FC<AuthViewProps> = ({ onLogin }) => {
               <p className="text-xs text-slate-500 dark:text-slate-400 font-bold uppercase tracking-widest">Casa360 Intelligent Home</p>
             </div>
 
+            {error && (
+              <div className="bg-rose-50 dark:bg-rose-900/20 p-4 rounded-xl border border-rose-100 dark:border-rose-800 flex items-center gap-3 text-rose-600 dark:text-rose-400 text-xs font-bold animate-in shake duration-300">
+                <AlertCircle className="w-4 h-4 shrink-0" /> {error}
+              </div>
+            )}
+
+            {successMessage && (
+              <div className="bg-emerald-50 dark:bg-emerald-900/20 p-4 rounded-xl border border-emerald-100 dark:border-emerald-800 flex items-center gap-3 text-emerald-600 dark:text-emerald-400 text-xs font-bold animate-in slide-in-from-top duration-300">
+                <CheckCircle2 className="w-4 h-4 shrink-0" /> {successMessage}
+              </div>
+            )}
+
             <form onSubmit={handleAuth} className="space-y-4">
+              {mode === 'signup' && (
+                <div className="space-y-2">
+                  <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Nome Completo</label>
+                  <div className="relative">
+                    <User className="absolute left-4 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-400" />
+                    <input 
+                      type="text" 
+                      required 
+                      value={fullName}
+                      onChange={e => setFullName(e.target.value)}
+                      className="w-full bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 rounded-xl pl-12 pr-4 py-4 text-sm font-bold text-slate-800 dark:text-white outline-none focus:ring-2 ring-indigo-500/20 transition-all"
+                      placeholder="Seu nome"
+                    />
+                  </div>
+                </div>
+              )}
+              
               <div className="space-y-2">
                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">E-mail</label>
                 <div className="relative">
@@ -118,6 +184,7 @@ const AuthView: React.FC<AuthViewProps> = ({ onLogin }) => {
                   />
                 </div>
               </div>
+              
               <div className="space-y-2">
                 <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest ml-1">Senha</label>
                 <div className="relative">
@@ -125,6 +192,7 @@ const AuthView: React.FC<AuthViewProps> = ({ onLogin }) => {
                   <input 
                     type="password" 
                     required 
+                    minLength={6}
                     value={password}
                     onChange={e => setPassword(e.target.value)}
                     className="w-full bg-slate-50 dark:bg-slate-800/50 border border-slate-100 dark:border-slate-800 rounded-xl pl-12 pr-4 py-4 text-sm font-bold text-slate-800 dark:text-white outline-none focus:ring-2 ring-indigo-500/20 transition-all"
@@ -135,15 +203,20 @@ const AuthView: React.FC<AuthViewProps> = ({ onLogin }) => {
 
               <button 
                 type="submit"
-                className="w-full bg-indigo-600 text-white py-5 rounded-2xl font-black text-sm flex items-center justify-center gap-3 hover:bg-indigo-700 active:scale-95 transition-all shadow-xl shadow-indigo-200 dark:shadow-none mt-4"
+                disabled={loading}
+                className="w-full bg-indigo-600 text-white py-5 rounded-2xl font-black text-sm flex items-center justify-center gap-3 hover:bg-indigo-700 active:scale-95 transition-all shadow-xl shadow-indigo-200 dark:shadow-none mt-4 disabled:opacity-50"
               >
-                {mode === 'login' ? <><LogIn className="w-4 h-4" /> Entrar</> : <><UserPlus className="w-4 h-4" /> Criar Conta</>}
+                {loading ? <Loader2 className="w-4 h-4 animate-spin" /> : mode === 'login' ? <><LogIn className="w-4 h-4" /> Entrar</> : <><UserPlus className="w-4 h-4" /> Criar Conta</>}
               </button>
             </form>
 
             <div className="text-center pt-2">
               <button 
-                onClick={() => setMode(mode === 'login' ? 'signup' : 'login')}
+                onClick={() => {
+                  setMode(mode === 'login' ? 'signup' : 'login');
+                  setError(null);
+                  setSuccessMessage(null);
+                }}
                 className="text-[10px] font-black text-slate-400 hover:text-indigo-600 uppercase tracking-widest transition-colors"
               >
                 {mode === 'login' ? 'Não tem uma conta? Cadastre-se' : 'Já possui conta? Faça login'}
@@ -153,7 +226,7 @@ const AuthView: React.FC<AuthViewProps> = ({ onLogin }) => {
         )}
       </div>
       
-      <p className="mt-8 text-[10px] font-bold text-slate-400 dark:text-slate-600 uppercase tracking-[0.2em]">Versão 2.1 • Personal Project</p>
+      <p className="mt-8 text-[10px] font-bold text-slate-400 dark:text-slate-600 uppercase tracking-[0.2em]">Versão 2.2 • Produção Vercel</p>
     </div>
   );
 };

@@ -16,7 +16,8 @@ import {
   ChevronRight,
   Sparkles,
   LogOut,
-  MoreHorizontal
+  MoreHorizontal,
+  Loader2
 } from 'lucide-react';
 import { Task, Transaction, HomeState, Medication, UserProfile, AuthState } from './types';
 import Dashboard from './components/Dashboard';
@@ -28,6 +29,7 @@ import HealthView from './components/HealthView';
 import ShoppingView from './components/ShoppingView';
 import AuthView from './components/AuthView';
 import { notificationService } from './services/notificationService';
+import { supabase } from './services/supabaseClient';
 
 const INITIAL_PROFILE: UserProfile = {
   fullName: 'Usuário Casa360',
@@ -63,12 +65,66 @@ const App: React.FC = () => {
   const [activeTab, setActiveTab] = useState<TabId>('dashboard');
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
-  const [state, setState] = useState<HomeState>(() => {
-    const saved = localStorage.getItem('casa360_state');
-    return saved ? JSON.parse(saved) : INITIAL_STATE;
-  });
+  const [loadingSession, setLoadingSession] = useState(true);
+  const [state, setState] = useState<HomeState>(INITIAL_STATE);
   
   const [activeAlarm, setActiveAlarm] = useState<Task | null>(null);
+
+  // Monitorar Autenticação do Supabase
+  useEffect(() => {
+    // 1. Checar sessão atual ao carregar
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (session) {
+        handleAuthChange(session);
+      }
+      setLoadingSession(false);
+    });
+
+    // 2. Escutar mudanças (Login/Logout)
+    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
+      handleAuthChange(session);
+    });
+
+    return () => subscription.unsubscribe();
+  }, []);
+
+  const handleAuthChange = async (session: any) => {
+    if (session) {
+      // Carregar perfil do banco
+      const { data: profileData } = await supabase
+        .from('profiles')
+        .select('*')
+        .eq('id', session.user.id)
+        .single();
+
+      setState(prev => ({
+        ...prev,
+        auth: {
+          isLoggedIn: true,
+          userEmail: session.user.email,
+          lastLogin: new Date().toISOString()
+        },
+        profile: profileData ? {
+          fullName: profileData.full_name || '',
+          email: profileData.email || '',
+          birthDate: profileData.birth_date || '',
+          phone: profileData.phone || '',
+          houseName: profileData.house_name || 'Minha Casa',
+          profileImage: profileData.profile_image,
+          address: {
+            street: profileData.address_street || '',
+            number: profileData.address_number || '',
+            city: profileData.address_city || '',
+            state: profileData.address_state || '',
+            zip: profileData.address_zip || '',
+          }
+        } : prev.profile,
+        theme: profileData?.theme || prev.theme
+      }));
+    } else {
+      setState(INITIAL_STATE);
+    }
+  };
 
   // Sincronização do Dark Mode
   useEffect(() => {
@@ -79,7 +135,7 @@ const App: React.FC = () => {
     }
   }, [state.theme]);
 
-  // Checagem de Alarmes
+  // Checagem de Alarmes (Local)
   useEffect(() => {
     if (!state.auth.isLoggedIn) return;
 
@@ -106,28 +162,9 @@ const App: React.FC = () => {
     return () => clearInterval(checkAlarms);
   }, [state.tasks, state.auth.isLoggedIn]);
 
-  useEffect(() => {
-    localStorage.setItem('casa360_state', JSON.stringify(state));
-  }, [state]);
-
-  const handleLogin = (email: string, isNew: boolean = false) => {
-    setState(prev => ({
-      ...prev,
-      auth: {
-        isLoggedIn: true,
-        userEmail: email,
-        lastLogin: new Date().toISOString()
-      },
-      profile: isNew ? { ...INITIAL_PROFILE, email } : prev.profile
-    }));
-    notificationService.requestPermission();
-  };
-
-  const handleLogout = () => {
-    setState(prev => ({
-      ...prev,
-      auth: INITIAL_AUTH
-    }));
+  const handleLogout = async () => {
+    await supabase.auth.signOut();
+    setState(INITIAL_STATE);
   };
 
   const addTask = (task: Omit<Task, 'id' | 'createdAt'>) => {
@@ -183,8 +220,16 @@ const App: React.FC = () => {
 
   const bottomNavItems = navItems.slice(0, 5);
 
+  if (loadingSession) {
+    return (
+      <div className="min-h-screen bg-slate-50 dark:bg-slate-950 flex items-center justify-center">
+        <Loader2 className="w-10 h-10 text-indigo-600 animate-spin" />
+      </div>
+    );
+  }
+
   if (!state.auth.isLoggedIn) {
-    return <AuthView onLogin={handleLogin} />;
+    return <AuthView onLogin={() => {}} />;
   }
 
   return (

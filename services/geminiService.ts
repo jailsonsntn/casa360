@@ -2,9 +2,14 @@
 import { GoogleGenAI, Type } from "@google/genai";
 import { Task, Transaction } from "../types";
 
-const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+// Proteção para evitar crash se process.env não estiver pronto
+const getApiKey = () => (typeof process !== 'undefined' && process.env?.API_KEY) || '';
 
 export const getHomeInsights = async (tasks: Task[], transactions: Transaction[]) => {
+  const apiKey = getApiKey();
+  if (!apiKey) return { spendingInsights: "Configuração pendente.", maintenanceSuggestions: "API Key não encontrada." };
+  
+  const ai = new GoogleGenAI({ apiKey });
   const prompt = `
     You are an expert home management consultant. 
     Analyze the following home data and provide concise, actionable insights for the user.
@@ -54,7 +59,10 @@ export interface WeatherData {
 
 export const getWeatherInfo = async (city: string, state: string): Promise<WeatherData | null> => {
   if (!city || !state) return null;
+  const apiKey = getApiKey();
+  if (!apiKey) return null;
 
+  const ai = new GoogleGenAI({ apiKey });
   const prompt = `Consulte o clima atual para a localização: ${city}, ${state}. 
   Retorne um JSON com:
   1. temp: a temperatura atual em Celsius (ex: "26°C").
