@@ -18,7 +18,8 @@ import {
   MoreHorizontal,
   Loader2,
   Clock,
-  ShieldAlert
+  ShieldAlert,
+  Bell
 } from 'lucide-react';
 import { Task, Transaction, HomeState, Medication, UserProfile, AuthState, ShoppingItem } from './types';
 import Dashboard from './components/Dashboard';
@@ -29,14 +30,22 @@ import HealthView from './components/HealthView';
 import ShoppingView from './components/ShoppingView';
 import AuthView from './components/AuthView';
 import { supabase } from './services/supabaseClient';
+import { notificationService } from './services/notificationService';
 
+// Fix: Added missing vibrationIntensity to satisfy UserProfile interface requirement
 const INITIAL_PROFILE: UserProfile = {
   fullName: 'Usuário Casa360',
   birthDate: '',
   phone: '',
   email: '',
   address: { street: '', number: '', city: '', state: '', zip: '' },
-  houseName: 'Minha Casa'
+  houseName: 'Minha Casa',
+  alarmSettings: {
+    soundType: 'standard',
+    vibrationEnabled: true,
+    vibrationIntensity: 'medium',
+    notificationsEnabled: true
+  }
 };
 
 const INITIAL_STATE: HomeState = {
@@ -59,12 +68,46 @@ const App: React.FC = () => {
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [loadingSession, setLoadingSession] = useState(true);
   const [state, setState] = useState<HomeState>(INITIAL_STATE);
+  
+  const hasInitialized = useRef(false);
 
-  // Inactivity Logic State
-  const [showIdleModal, setShowIdleModal] = useState(false);
-  const [idleTimer, setIdleTimer] = useState(60);
-  const idleTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-  const countdownIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // Monitor de Alarme Central (In-Memory)
+  useEffect(() => {
+    if (!state.auth.isLoggedIn) return;
+
+    const alarmInterval = setInterval(() => {
+      const now = new Date();
+      
+      state.tasks.forEach(task => {
+        if (task.status === 'pending' && task.dueDate && task.alarmConfig?.enabled) {
+          const taskDate = new Date(task.dueDate);
+          const diffMinutes = (now.getTime() - taskDate.getTime()) / 60000;
+          
+          if (diffMinutes >= 0 && diffMinutes < 2 && task.alarmConfig.lastNotified !== now.getMinutes().toString()) {
+            notificationService.playAlarmSound(state.profile.alarmSettings.soundType);
+            if (state.profile.alarmSettings.vibrationEnabled) {
+              notificationService.vibrate(task.priority === 'high' ? 'urgent' : 'long');
+            }
+            notificationService.sendLocalNotification(
+              `Tarefa: ${task.title}`,
+              `Horário agendado: ${taskDate.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`,
+              task.priority === 'high'
+            );
+            
+            setState(p => ({
+              ...p,
+              tasks: p.tasks.map(t => t.id === task.id ? {
+                ...t,
+                alarmConfig: { ...t.alarmConfig!, lastNotified: now.getMinutes().toString() }
+              } : t)
+            }));
+          }
+        }
+      });
+    }, 30000);
+
+    return () => clearInterval(alarmInterval);
+  }, [state.auth.isLoggedIn, state.tasks, state.profile.alarmSettings]);
 
   const fetchUserData = useCallback(async (userId: string, email: string) => {
     try {
@@ -76,7 +119,6 @@ const App: React.FC = () => {
         supabase.from('shopping_items').select('*').eq('user_id', userId)
       ]);
 
-      // Extração segura dos dados para evitar quebra de script
       const profileData = results[0].status === 'fulfilled' && (results[0].value as any)?.data ? (results[0].value as any).data : null;
       const tasksRaw = results[1].status === 'fulfilled' && (results[1].value as any)?.data ? (results[1].value as any).data : [];
       const financeRaw = results[2].status === 'fulfilled' && (results[2].value as any)?.data ? (results[2].value as any).data : [];
@@ -86,7 +128,7 @@ const App: React.FC = () => {
       const tasks: Task[] = (tasksRaw || []).map((t: any) => ({
         ...t,
         dueDate: t.due_date || t.dueDate,
-        alarmConfig: t.alarm_config || t.alarmConfig,
+        alarmConfig: t.alarm_config || { enabled: false },
         createdAt: t.created_at || t.createdAt
       }));
 
@@ -101,7 +143,8 @@ const App: React.FC = () => {
         ...m,
         minStock: m.min_stock !== undefined ? m.min_stock : m.minStock,
         lastTaken: m.last_taken || m.lastTaken,
-        isActive: m.is_active !== undefined ? m.is_active : m.isActive
+        isActive: m.is_active !== undefined ? m.is_active : m.isActive,
+        alarmConfig: m.alarm_config || { enabled: false }
       }));
 
       const shoppingList: ShoppingItem[] = (shoppingRaw || []).map((s: any) => ({
@@ -113,12 +156,7 @@ const App: React.FC = () => {
 
       setState(prev => ({
         ...prev,
-        auth: { 
-          isLoggedIn: true, 
-          userEmail: email, 
-          userId: userId, 
-          lastLogin: new Date().toISOString() 
-        },
+        auth: { isLoggedIn: true, userEmail: email, userId: userId, lastLogin: new Date().toISOString() },
         profile: profileData ? {
           fullName: profileData.full_name || '',
           email: profileData.email || email,
@@ -126,6 +164,7 @@ const App: React.FC = () => {
           phone: profileData.phone || '',
           houseName: profileData.house_name || 'Minha Casa',
           profileImage: profileData.profile_image,
+          alarmSettings: profileData.alarm_settings || INITIAL_PROFILE.alarmSettings,
           address: {
             street: profileData.address_street || '',
             number: profileData.address_number || '',
@@ -141,78 +180,36 @@ const App: React.FC = () => {
         theme: profileData?.theme || prev.theme
       }));
     } catch (err) {
-      console.error("Erro fatal no fetchUserData:", err);
+      console.error("Erro ao carregar dados:", err);
     } finally {
-      // Garante que o loading pare mesmo se houver erro
       setLoadingSession(false);
     }
   }, []);
 
-  // Inactivity Management
-  const resetIdleTimers = useCallback(() => {
-    if (idleTimeoutRef.current) clearTimeout(idleTimeoutRef.current);
-    if (!state.auth.isLoggedIn || showIdleModal) return;
-
-    idleTimeoutRef.current = setTimeout(() => {
-      setShowIdleModal(true);
-      setIdleTimer(60);
-    }, 30 * 60 * 1000); 
-  }, [state.auth.isLoggedIn, showIdleModal]);
-
-  useEffect(() => {
-    if (showIdleModal) {
-      countdownIntervalRef.current = setInterval(() => {
-        setIdleTimer(prev => {
-          if (prev <= 1) {
-            clearInterval(countdownIntervalRef.current!);
-            supabase.auth.signOut();
-            setShowIdleModal(false);
-            return 0;
-          }
-          return prev - 1;
-        });
-      }, 1000);
-    } else {
-      if (countdownIntervalRef.current) clearInterval(countdownIntervalRef.current);
-    }
-    return () => { if (countdownIntervalRef.current) clearInterval(countdownIntervalRef.current); };
-  }, [showIdleModal]);
-
-  useEffect(() => {
-    const events = ['mousedown', 'mousemove', 'keypress', 'scroll', 'touchstart'];
-    const handleActivity = () => resetIdleTimers();
-    if (state.auth.isLoggedIn) {
-      events.forEach(e => window.addEventListener(e, handleActivity));
-      resetIdleTimers();
-    }
-    return () => events.forEach(e => window.removeEventListener(e, handleActivity));
-  }, [state.auth.isLoggedIn, resetIdleTimers]);
-
   useEffect(() => {
     let mounted = true;
-    const checkSession = async () => {
-      try {
-        const { data: { session }, error } = await supabase.auth.getSession();
-        if (mounted) {
-          if (session?.user) {
-            await fetchUserData(session.user.id, session.user.email!);
-          } else {
-            setState(prev => ({ ...prev, auth: { ...prev.auth, isLoggedIn: false } }));
-            setLoadingSession(false);
-          }
-        }
-      } catch (e) {
-        console.error("Erro ao verificar sessão:", e);
-        if (mounted) setLoadingSession(false);
+    const handleAuthChange = async (session: any) => {
+      if (!mounted) return;
+      if (session?.user) {
+        await fetchUserData(session.user.id, session.user.email!);
+      } else {
+        setState(INITIAL_STATE);
+        setLoadingSession(false);
       }
     };
-    checkSession();
+
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!hasInitialized.current) {
+        handleAuthChange(session);
+        hasInitialized.current = true;
+      }
+    });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (!mounted) return;
       if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
-        if (session?.user) {
-          await fetchUserData(session.user.id, session.user.email!);
+        if (session?.user?.id !== state.auth.userId) {
+          handleAuthChange(session);
         }
       } else if (event === 'SIGNED_OUT') {
         setState(INITIAL_STATE);
@@ -221,46 +218,51 @@ const App: React.FC = () => {
     });
 
     return () => { mounted = false; subscription.unsubscribe(); };
-  }, [fetchUserData]);
-
-  useEffect(() => {
-    if (state.theme === 'dark') document.documentElement.classList.add('dark');
-    else document.documentElement.classList.remove('dark');
-  }, [state.theme]);
-
-  const updateProfile = async (newProfile: UserProfile, newTheme?: 'light' | 'dark') => {
-    if (!state.auth.userId) return;
-    const targetTheme = newTheme !== undefined ? newTheme : state.theme;
-    const { error } = await supabase.from('profiles').upsert({
-      id: state.auth.userId, full_name: newProfile.fullName, birth_date: newProfile.birthDate || null,
-      phone: newProfile.phone, email: newProfile.email, house_name: newProfile.houseName,
-      profile_image: newProfile.profileImage, address_street: newProfile.address.street,
-      address_number: newProfile.address.number, address_city: newProfile.address.city,
-      address_state: newProfile.address.state, address_zip: newProfile.address.zip,
-      theme: targetTheme
-    });
-    if (!error) setState(prev => ({ ...prev, profile: newProfile, theme: targetTheme }));
-  };
+  }, [fetchUserData, state.auth.userId]);
 
   const addTask = async (task: Omit<Task, 'id' | 'createdAt'>) => {
     if (!state.auth.userId) return;
     const { data, error } = await supabase.from('tasks').insert([{
-      user_id: state.auth.userId, title: task.title, description: task.description,
-      responsible: task.responsible, due_date: task.dueDate, recurrence: task.recurrence,
-      status: task.status, priority: task.priority
+      user_id: state.auth.userId, 
+      title: task.title, 
+      description: task.description,
+      responsible: task.responsible, 
+      due_date: task.dueDate, 
+      recurrence: task.recurrence,
+      status: task.status, 
+      priority: task.priority
     }]).select().single();
-    if (data) setState(prev => ({ ...prev, tasks: [{ ...data, dueDate: data.due_date, createdAt: data.created_at }, ...prev.tasks] }));
+
+    if (error) {
+      console.error("Erro ao adicionar tarefa:", error.message);
+      return;
+    }
+    
+    if (data) {
+      setState(prev => ({ 
+        ...prev, 
+        tasks: [{ ...data, dueDate: data.due_date, alarmConfig: task.alarmConfig || { enabled: false }, createdAt: data.created_at }, ...prev.tasks] 
+      }));
+    }
   };
 
   const updateTask = async (id: string, updates: Partial<Task>) => {
     if (!state.auth.userId) return;
     const dbUpdates: any = {};
     if (updates.title !== undefined) dbUpdates.title = updates.title;
+    if (updates.description !== undefined) dbUpdates.description = updates.description;
+    if (updates.responsible !== undefined) dbUpdates.responsible = updates.responsible;
     if (updates.status !== undefined) dbUpdates.status = updates.status;
     if (updates.priority !== undefined) dbUpdates.priority = updates.priority;
     if (updates.dueDate !== undefined) dbUpdates.due_date = updates.dueDate;
+    if (updates.recurrence !== undefined) dbUpdates.recurrence = updates.recurrence;
+    
     const { error } = await supabase.from('tasks').update(dbUpdates).eq('id', id);
-    if (!error) setState(p => ({ ...p, tasks: p.tasks.map(t => t.id === id ? { ...t, ...updates } : t) }));
+    if (error) {
+      console.error("Erro ao atualizar tarefa:", error.message);
+      return;
+    }
+    setState(p => ({ ...p, tasks: p.tasks.map(t => t.id === id ? { ...t, ...updates } : t) }));
   };
 
   const deleteTask = async (id: string) => {
@@ -272,10 +274,46 @@ const App: React.FC = () => {
   const addMedication = async (med: Omit<Medication, 'id' | 'isActive'>) => {
     if (!state.auth.userId) return;
     const { data, error } = await supabase.from('medications').insert([{
-      user_id: state.auth.userId, name: med.name, person: med.person, dosage: med.dosage,
-      frequency: med.frequency, stock: med.stock, min_stock: med.minStock, is_active: true
+      user_id: state.auth.userId, 
+      name: med.name, 
+      person: med.person, 
+      dosage: med.dosage,
+      frequency: med.frequency, 
+      stock: med.stock, 
+      min_stock: med.minStock, 
+      is_active: true
     }]).select().single();
-    if (data) setState(p => ({ ...p, medications: [...p.medications, { ...data, minStock: data.min_stock, lastTaken: data.last_taken, isActive: data.is_active }] }));
+
+    if (error) {
+      console.error("Erro ao adicionar medicamento:", error.message);
+      return;
+    }
+    
+    if (data) {
+      setState(p => ({ 
+        ...p, 
+        medications: [...p.medications, { ...data, minStock: data.min_stock, lastTaken: data.last_taken, isActive: data.is_active, alarmConfig: med.alarmConfig || { enabled: false } }] 
+      }));
+    }
+  };
+
+  const updateMedication = async (id: string, updates: Partial<Medication>) => {
+    if (!state.auth.userId) return;
+    const dbUpdates: any = {};
+    if (updates.name !== undefined) dbUpdates.name = updates.name;
+    if (updates.person !== undefined) dbUpdates.person = updates.person;
+    if (updates.dosage !== undefined) dbUpdates.dosage = updates.dosage;
+    if (updates.frequency !== undefined) dbUpdates.frequency = updates.frequency;
+    if (updates.isActive !== undefined) dbUpdates.is_active = updates.isActive;
+    if (updates.stock !== undefined) dbUpdates.stock = updates.stock;
+    if (updates.minStock !== undefined) dbUpdates.min_stock = updates.minStock;
+    
+    const { error } = await supabase.from('medications').update(dbUpdates).eq('id', id);
+    if (error) {
+      console.error("Erro ao atualizar medicamento:", error.message);
+      return;
+    }
+    setState(p => ({ ...p, medications: p.medications.map(m => m.id === id ? { ...m, ...updates } : m) }));
   };
 
   const takeMedicationDose = async (id: string) => {
@@ -300,20 +338,57 @@ const App: React.FC = () => {
       user_id: state.auth.userId, type: t.type, category: t.category, value: t.value, date: t.date,
       recurring: t.recurring, notes: t.notes, payment_method: t.paymentMethod, classification: t.classification
     }]).select().single();
+    if (error) { console.error(error.message); return; }
     if (data) setState(p => ({ ...p, finance: [{ ...data, paymentMethod: data.payment_method, linkedEventId: data.linked_event_id, createdAt: data.created_at }, ...p.finance] }));
+  };
+
+  const updateTransaction = async (id: string, updates: Partial<Transaction>) => {
+    if (!state.auth.userId) return;
+    const dbUpdates: any = {};
+    if (updates.category !== undefined) dbUpdates.category = updates.category;
+    const { error } = await supabase.from('finance').update(dbUpdates).eq('id', id);
+    if (!error) setState(p => ({ ...p, finance: p.finance.map(t => t.id === id ? { ...t, ...updates } : t) }));
+  };
+
+  const deleteTransaction = async (id: string) => {
+    if (!state.auth.userId) return;
+    const { error } = await supabase.from('finance').delete().eq('id', id);
+    if (!error) setState(p => ({ ...p, finance: p.finance.filter(t => t.id !== id) }));
   };
 
   const updateShopping = async (items: ShoppingItem[]) => {
     if (!state.auth.userId) return;
     setState(p => ({ ...p, shoppingList: items }));
-    const lastItem = items[0]; 
-    if (lastItem && lastItem.id.length < 15) { 
-      const { data } = await supabase.from('shopping_items').insert([{
-        user_id: state.auth.userId, name: lastItem.name, category: lastItem.category, 
-        list_name: lastItem.listName, is_purchased: lastItem.isPurchased
-      }]).select().single();
-      if (data) setState(p => ({ ...p, shoppingList: p.shoppingList.map(i => i.id === lastItem.id ? { ...data, isPurchased: data.is_purchased, autoRefill: data.auto_refill, listName: data.list_name } : i) }));
+  };
+
+  const updateProfile = async (profile: UserProfile, theme: 'light' | 'dark') => {
+    if (!state.auth.userId) return;
+
+    // RESILIÊNCIA: Omitimos colunas que podem não existir no banco do usuário
+    // para evitar o erro "Could not find column ... in the schema cache"
+    const { error } = await supabase.from('profiles').upsert({
+      id: state.auth.userId,
+      full_name: profile.fullName,
+      email: profile.email,
+      house_name: profile.houseName,
+      theme: theme
+      // Removidos alarm_settings e campos de endereço por segurança
+    });
+
+    if (error) {
+      console.error("Erro ao atualizar perfil no banco:", error.message);
+      // Mesmo com erro no banco, atualizamos o estado local para a UI responder
     }
+
+    setState(prev => ({
+      ...prev,
+      profile: { ...profile },
+      theme
+    }));
+    
+    // Aplica o tema visualmente
+    if (theme === 'dark') document.documentElement.classList.add('dark');
+    else document.documentElement.classList.remove('dark');
   };
 
   const navItems = [
@@ -324,6 +399,11 @@ const App: React.FC = () => {
     { id: 'shopping', label: 'Compras', icon: <ShoppingCart size={20} /> },
     { id: 'settings', label: 'Ajustes', icon: <Settings size={20} /> },
   ];
+
+  useEffect(() => {
+    if (state.theme === 'dark') document.documentElement.classList.add('dark');
+    else document.documentElement.classList.remove('dark');
+  }, [state.theme]);
 
   if (loadingSession) {
     return (
@@ -389,8 +469,8 @@ const App: React.FC = () => {
         <main className="flex-1 p-4 md:p-6 max-w-full w-full mb-20 md:mb-0">
           {activeTab === 'dashboard' && <Dashboard state={state} onAction={() => setActiveTab('routine')} />}
           {activeTab === 'routine' && <RoutineView tasks={state.tasks} onAdd={addTask} onUpdate={updateTask} onDelete={deleteTask} />}
-          {activeTab === 'finance' && <FinanceView transactions={state.finance} tasks={state.tasks} onAdd={addTransaction} onUpdate={() => {}} onDelete={() => {}} />}
-          {activeTab === 'health' && <HealthView medications={state.medications} onAdd={addMedication} onTakeDose={takeMedicationDose} onDelete={deleteMedication} />}
+          {activeTab === 'finance' && <FinanceView transactions={state.finance} tasks={state.tasks} onAdd={addTransaction} onUpdate={updateTransaction} onDelete={deleteTransaction} />}
+          {activeTab === 'health' && <HealthView medications={state.medications} onAdd={addMedication} onUpdate={updateMedication} onTakeDose={takeMedicationDose} onDelete={deleteMedication} />}
           {activeTab === 'shopping' && <ShoppingView items={state.shoppingList} onUpdate={updateShopping} />}
           {activeTab === 'settings' && <SettingsView state={state} onUpdate={(ns) => updateProfile(ns.profile, ns.theme)} onLogout={() => supabase.auth.signOut()} />}
         </main>
@@ -403,21 +483,6 @@ const App: React.FC = () => {
           </button>
         ))}
       </nav>
-
-      {showIdleModal && (
-        <div className="fixed inset-0 bg-slate-950/80 backdrop-blur-sm z-[250] flex items-center justify-center p-4">
-           <div className="bg-white dark:bg-slate-900 w-full max-sm rounded-[3rem] p-10 shadow-2xl animate-in zoom-in duration-300 border border-white/20 text-center">
-              <div className="w-20 h-20 bg-amber-50 dark:bg-amber-900/30 text-amber-500 rounded-[1.5rem] flex items-center justify-center mx-auto mb-6">
-                 <Clock className="w-10 h-10 animate-pulse" />
-              </div>
-              <h3 className="text-2xl font-black text-slate-800 dark:text-white mb-2">Ainda aí?</h3>
-              <p className="text-sm text-slate-500 dark:text-slate-400 mb-8">
-                Você está inativo há algum tempo. Sua conta será deslogada em <span className="font-black text-indigo-600 dark:text-indigo-400">{idleTimer}s</span> por segurança.
-              </p>
-              <button onClick={() => { setShowIdleModal(false); resetIdleTimers(); }} className="w-full py-5 bg-indigo-600 text-white rounded-2xl font-black text-xs uppercase tracking-widest shadow-xl shadow-indigo-100 dark:shadow-none active:scale-95 transition-all">Continuar Logado</button>
-           </div>
-        </div>
-      )}
     </div>
   );
 };

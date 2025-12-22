@@ -1,30 +1,20 @@
 
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo } from 'react';
 import { Transaction, TransactionType, Task, PaymentMethod, TransactionClassification } from '../types';
 import { 
   Plus, 
   X, 
-  TrendingUp, 
-  TrendingDown, 
-  CreditCard, 
-  Wallet, 
-  Banknote, 
-  ArrowRightLeft,
-  Smartphone,
-  Tag,
+  Trash2, 
+  Edit2,
   ArrowUpRight,
   ArrowDownLeft,
-  Layers,
+  ArrowLeft,
+  ArrowRight,
+  Calculator,
+  Save,
   Check,
-  ChevronDown
+  AlertTriangle
 } from 'lucide-react';
-import { 
-  Tooltip, 
-  ResponsiveContainer,
-  AreaChart, Area, 
-  XAxis, YAxis, 
-  CartesianGrid
-} from 'recharts';
 
 interface FinanceViewProps {
   transactions: Transaction[];
@@ -34,12 +24,12 @@ interface FinanceViewProps {
   onDelete: (id: string) => void;
 }
 
-const PAYMENT_METHODS: { id: PaymentMethod; label: string; icon: React.ReactNode }[] = [
-  { id: 'credit_card', label: 'Crédito', icon: <CreditCard className="w-4 h-4" /> },
-  { id: 'debit_card', label: 'Débito', icon: <Wallet className="w-4 h-4" /> },
-  { id: 'cash', label: 'Dinheiro', icon: <Banknote className="w-4 h-4" /> },
-  { id: 'transfer', label: 'Transf.', icon: <ArrowRightLeft className="w-4 h-4" /> },
-  { id: 'pix', label: 'Pix', icon: <Smartphone className="w-4 h-4" /> },
+const PAYMENT_METHODS: { id: PaymentMethod; label: string }[] = [
+  { id: 'pix', label: 'Pix' },
+  { id: 'credit_card', label: 'Crédito' },
+  { id: 'debit_card', label: 'Débito' },
+  { id: 'cash', label: 'Dinheiro' },
+  { id: 'transfer', label: 'Transf.' },
 ];
 
 const CLASSIFICATIONS: { id: TransactionClassification; label: string }[] = [
@@ -50,302 +40,274 @@ const CLASSIFICATIONS: { id: TransactionClassification; label: string }[] = [
 
 const FinanceView: React.FC<FinanceViewProps> = ({ transactions, tasks, onAdd, onUpdate, onDelete }) => {
   const [isAdding, setIsAdding] = useState(false);
-  const [editingTransaction, setEditingTransaction] = useState<Transaction | null>(null);
-  const [activeView, setActiveView] = useState<'list' | 'stats' | 'summary'>('summary');
+  const [editingItem, setEditingItem] = useState<Transaction | null>(null);
+  const [itemToDelete, setItemToDelete] = useState<Transaction | null>(null);
+  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
 
-  // Form State
   const [type, setType] = useState<TransactionType>('expense');
   const [category, setCategory] = useState('');
   const [value, setValue] = useState('');
   const [date, setDate] = useState(new Date().toISOString().split('T')[0]);
-  const [notes, setNotes] = useState('');
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('credit_card');
-  const [classification, setClassification] = useState<TransactionClassification>('variable');
-  const [linkedEvent, setLinkedEvent] = useState('');
+  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('pix');
+  const [classification, setClassification] = useState<TransactionClassification>('fixed');
 
-  useEffect(() => {
-    if (editingTransaction) {
-      setType(editingTransaction.type);
-      setCategory(editingTransaction.category);
-      setValue(editingTransaction.value.toString());
-      setDate(editingTransaction.date);
-      setNotes(editingTransaction.notes || '');
-      setPaymentMethod(editingTransaction.paymentMethod);
-      setClassification(editingTransaction.classification);
-      setLinkedEvent(editingTransaction.linkedEventId || '');
-      setIsAdding(true);
-    }
-  }, [editingTransaction]);
+  const monthNames = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
 
-  const summary = useMemo(() => transactions.reduce((acc, curr) => {
-    if (curr.type === 'expense') acc.expenses += curr.value;
-    else acc.income += curr.value;
-    return acc;
-  }, { expenses: 0, income: 0 }), [transactions]);
+  const processedData = useMemo(() => {
+    const viewDateStart = new Date(selectedYear, selectedMonth, 1);
+    const realThisMonth = transactions.filter(t => {
+      const d = new Date(t.date);
+      return d.getMonth() === selectedMonth && d.getFullYear() === selectedYear;
+    });
 
-  const resetForm = () => {
-    setIsAdding(false); 
-    setEditingTransaction(null); 
-    setCategory(''); 
-    setValue(''); 
-    setNotes(''); 
-    setLinkedEvent(''); 
-    setType('expense');
+    const projections: Transaction[] = [];
+    const fixedMasters = transactions
+      .filter(t => t.classification === 'fixed' || t.classification === 'recurring')
+      .reduce((acc, curr) => {
+        if (!acc[curr.category] || new Date(curr.date) > new Date(acc[curr.category].date)) {
+          acc[curr.category] = curr;
+        }
+        return acc;
+      }, {} as Record<string, Transaction>);
+
+    (Object.values(fixedMasters) as Transaction[]).forEach(master => {
+      const masterDate = new Date(master.date);
+      const isBefore = new Date(masterDate.getFullYear(), masterDate.getMonth(), 1) < viewDateStart;
+      const alreadyHasReal = realThisMonth.some(r => r.category === master.category);
+      if (isBefore && !alreadyHasReal) {
+        projections.push({
+          ...master,
+          id: `proj-${master.id}`,
+          date: new Date(selectedYear, selectedMonth, masterDate.getDate()).toISOString().split('T')[0],
+          isForecast: true
+        });
+      }
+    });
+
+    const allItems = [...realThisMonth, ...projections];
+    const q1 = allItems.filter(t => new Date(t.date).getDate() <= 15).sort((a,b) => new Date(a.date).getDate() - new Date(b.date).getDate());
+    const q2 = allItems.filter(t => new Date(t.date).getDate() > 15).sort((a,b) => new Date(a.date).getDate() - new Date(b.date).getDate());
+
+    const q1Exp = q1.filter(t => t.type === 'expense').reduce((a, b) => a + b.value, 0);
+    const q1Inc = q1.filter(t => t.type === 'income').reduce((a, b) => a + b.value, 0);
+    const q2Exp = q2.filter(t => t.type === 'expense').reduce((a, b) => a + b.value, 0);
+    const q2Inc = q2.filter(t => t.type === 'income').reduce((a, b) => a + b.value, 0);
+
+    return { q1, q2, q1Exp, q1Inc, q2Exp, q2Inc, total: (q1Inc + q2Inc) - (q1Exp + q2Exp) };
+  }, [transactions, selectedMonth, selectedYear]);
+
+  const handleOpenEdit = (t: Transaction) => {
+    setEditingItem(t); setType(t.type); setCategory(t.category);
+    setValue(t.value.toString()); setDate(t.date);
+    setPaymentMethod(t.paymentMethod); setClassification(t.classification);
+    setIsAdding(true);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const data = { 
-      type, 
-      category, 
-      value: parseFloat(value), 
-      date, 
-      recurring: classification === 'recurring', 
-      notes, 
-      paymentMethod, 
-      classification, 
-      linkedEventId: linkedEvent || undefined 
+    const data = {
+      type, category, value: parseFloat(value), date,
+      recurring: classification === 'recurring' || classification === 'fixed',
+      notes: '', paymentMethod, classification
     };
-    if (editingTransaction) onUpdate(editingTransaction.id, data);
+    if (editingItem && !editingItem.isForecast) onUpdate(editingItem.id, data);
     else onAdd(data);
     resetForm();
   };
 
+  const resetForm = () => {
+    setIsAdding(false); setEditingItem(null); setCategory(''); setValue('');
+    setDate(new Date(selectedYear, selectedMonth, new Date().getDate()).toISOString().split('T')[0]);
+  };
+
+  const confirmDelete = () => {
+    if (itemToDelete && !itemToDelete.isForecast) {
+      onDelete(itemToDelete.id);
+      setItemToDelete(null);
+      if ('vibrate' in navigator) navigator.vibrate(20);
+    }
+  };
+
   return (
-    <div className="space-y-6 md:space-y-8 animate-in fade-in duration-500 max-w-full overflow-hidden">
-      <div className="flex flex-col md:flex-row md:items-center justify-between gap-6">
-        <div>
-          <h2 className="text-xl font-black text-slate-800 dark:text-slate-100 tracking-tight">Finanças</h2>
-          <p className="text-[10px] text-slate-400 font-bold uppercase tracking-widest">Controle patrimonial</p>
+    <div className="space-y-6 animate-in fade-in duration-500 pb-20 px-4">
+      <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+        <div className="flex items-center gap-3">
+          <div className="w-10 h-10 bg-indigo-600 rounded-xl flex items-center justify-center text-white shadow-md">
+            <Calculator size={18} />
+          </div>
+          <div>
+            <h2 className="text-lg font-black text-slate-800 dark:text-slate-100 tracking-tight leading-none">Finanças</h2>
+            <p className="text-[9px] text-slate-400 font-bold uppercase tracking-widest mt-1">Fluxo de Caixa</p>
+          </div>
         </div>
-        <div className="flex gap-1 bg-slate-100 dark:bg-slate-800 p-1 rounded-xl">
-          {['summary', 'list', 'stats'].map(tab => (
-            <button
-              key={tab}
-              onClick={() => setActiveView(tab as any)}
-              className={`px-4 py-2 text-[9px] font-black uppercase tracking-widest rounded-lg transition-all ${activeView === tab ? 'bg-white dark:bg-slate-700 text-indigo-600 shadow-sm' : 'text-slate-400'}`}
-            >
-              {tab === 'summary' ? 'Dashboard' : tab === 'list' ? 'Extrato' : 'Análise'}
-            </button>
+        <div className="flex items-center gap-2">
+          <div className="flex items-center gap-1 bg-white dark:bg-slate-900 p-1 rounded-xl border border-slate-100 dark:border-slate-800 shadow-sm">
+            <button onClick={() => selectedMonth === 0 ? (setSelectedYear(y => y-1), setSelectedMonth(11)) : setSelectedMonth(m => m-1)} className="p-1.5 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-lg text-slate-400"><ArrowLeft size={14}/></button>
+            <span className="px-2 text-[9px] font-black uppercase tracking-widest text-slate-700 dark:text-slate-200 min-w-[100px] text-center">{monthNames[selectedMonth]} {selectedYear}</span>
+            <button onClick={() => selectedMonth === 11 ? (setSelectedYear(y => y+1), setSelectedMonth(0)) : setSelectedMonth(m => m+1)} className="p-1.5 hover:bg-slate-50 dark:hover:bg-slate-800 rounded-lg text-slate-400"><ArrowRight size={14}/></button>
+          </div>
+          <button onClick={() => { resetForm(); setIsAdding(true); }} className="bg-indigo-600 text-white px-5 py-2.5 rounded-xl font-black text-[9px] uppercase tracking-widest shadow-lg flex items-center gap-2 active:scale-95 transition-all">
+            <Plus size={14} /> Novo
+          </button>
+        </div>
+      </div>
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+        <div className="lg:col-span-2 space-y-6">
+          {[
+            { label: '1ª Quinzena', data: processedData.q1, balance: processedData.q1Inc - processedData.q1Exp },
+            { label: '2ª Quinzena', data: processedData.q2, balance: processedData.q2Inc - processedData.q2Exp }
+          ].map((quinzena, idx) => (
+            <div key={idx} className="bg-white dark:bg-slate-900 rounded-[2.5rem] border border-slate-100 dark:border-slate-800 shadow-sm overflow-hidden">
+              <div className="px-6 py-4 border-b border-slate-50 dark:border-slate-800 flex justify-between items-center bg-slate-50/20">
+                <h3 className="text-[9px] font-black uppercase tracking-widest text-slate-400">{quinzena.label}</h3>
+                <span className={`text-[10px] font-black ${quinzena.balance >= 0 ? 'text-emerald-500' : 'text-rose-500'}`}>R$ {quinzena.balance.toLocaleString('pt-BR')}</span>
+              </div>
+              <div className="divide-y divide-slate-50 dark:divide-slate-800">
+                {quinzena.data.map(t => (
+                  <div key={t.id} className="px-6 py-3.5 flex items-center justify-between group hover:bg-slate-50/50 dark:hover:bg-slate-800/50 transition-colors">
+                    <div className="flex items-center gap-3">
+                      <div className={`w-8 h-8 rounded-lg flex items-center justify-center shrink-0 ${t.type === 'income' ? 'bg-emerald-50 text-emerald-600' : 'bg-rose-50 text-rose-600'}`}>
+                        {t.type === 'income' ? <ArrowUpRight size={14} /> : <ArrowDownLeft size={14} />}
+                      </div>
+                      <div className="min-w-0">
+                        <p className="text-[11px] font-bold text-slate-800 dark:text-slate-200 truncate">{t.category}</p>
+                        <p className="text-[8px] font-bold text-slate-400 uppercase">Dia {new Date(t.date).getDate()} • {t.paymentMethod}</p>
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-1.5">
+                      <p className={`text-xs font-black mr-2 ${t.type === 'income' ? 'text-emerald-600' : 'text-rose-600'}`}>R$ {t.value.toLocaleString('pt-BR')}</p>
+                      <button 
+                        onClick={() => handleOpenEdit(t)} 
+                        className="p-1.5 text-slate-300 hover:text-indigo-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                        title="Editar"
+                      >
+                        <Edit2 size={13}/>
+                      </button>
+                      {!t.isForecast && (
+                        <button 
+                          onClick={() => { setItemToDelete(t); if('vibrate' in navigator) navigator.vibrate(10); }} 
+                          className="p-1.5 text-slate-300 hover:text-rose-500 opacity-0 group-hover:opacity-100 transition-opacity"
+                          title="Excluir"
+                        >
+                          <Trash2 size={13}/>
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                ))}
+                {quinzena.data.length === 0 && (
+                  <div className="px-6 py-8 text-center text-slate-300 text-[10px] font-black uppercase tracking-widest">Nenhum lançamento</div>
+                )}
+              </div>
+            </div>
           ))}
         </div>
-      </div>
 
-      <div className="bg-slate-900 dark:bg-indigo-600 p-6 rounded-3xl text-white shadow-xl relative overflow-hidden group">
-        <div className="relative z-10 flex flex-col md:flex-row md:items-center justify-between gap-6">
-          <div className="space-y-1">
-            <span className="text-[9px] font-black text-white/50 uppercase tracking-[0.2em]">Saldo Disponível</span>
-            <h3 className="text-3xl font-black tracking-tighter">
-              R$ {(summary.income - summary.expenses).toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-            </h3>
-          </div>
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="bg-white/10 px-4 py-2 rounded-xl flex items-center gap-2">
-               <TrendingUp className="w-3.5 h-3.5 text-emerald-400" />
-               <p className="font-bold text-xs">R$ {summary.income.toLocaleString('pt-BR')}</p>
+        <div className="space-y-6">
+          <div className="bg-slate-900 dark:bg-indigo-700 p-7 rounded-[2.5rem] text-white shadow-xl border border-white/5">
+            <p className="text-[8px] font-black uppercase tracking-[0.2em] text-white/50 mb-2">Resumo Mensal</p>
+            <h4 className="text-3xl font-black tracking-tight mb-6">R$ {processedData.total.toLocaleString('pt-BR')}</h4>
+            <div className="space-y-3">
+               <div className="flex justify-between text-[10px] font-bold">
+                 <span className="opacity-60 uppercase">Entradas</span>
+                 <span className="text-emerald-400 font-black">+ R$ {(processedData.q1Inc+processedData.q2Inc).toLocaleString('pt-BR')}</span>
+               </div>
+               <div className="flex justify-between text-[10px] font-bold">
+                 <span className="opacity-60 uppercase">Saídas</span>
+                 <span className="text-rose-400 font-black">- R$ {(processedData.q1Exp+processedData.q2Exp).toLocaleString('pt-BR')}</span>
+               </div>
             </div>
-            <div className="bg-white/10 px-4 py-2 rounded-xl flex items-center gap-2">
-               <TrendingDown className="w-3.5 h-3.5 text-rose-400" />
-               <p className="font-bold text-xs">R$ {summary.expenses.toLocaleString('pt-BR')}</p>
-            </div>
-            <button onClick={() => setIsAdding(true)} className="bg-white text-slate-900 px-6 py-3 rounded-2xl font-black text-[10px] uppercase tracking-widest shadow-lg hover:scale-105 transition-all active:scale-95 flex items-center gap-2 ml-2">
-              <Plus size={14} /> Lançar Valores
-            </button>
           </div>
         </div>
       </div>
 
-      {activeView === 'summary' && (
-        <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
-           <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-100 dark:border-slate-800 shadow-sm h-64 flex flex-col">
-              <div className="flex justify-between items-center mb-4">
-                <h3 className="font-black text-slate-400 text-[9px] uppercase tracking-widest">Fluxo de Caixa</h3>
-                <Layers className="w-4 h-4 text-indigo-400" />
-              </div>
-              <div className="flex-1">
-                <ResponsiveContainer width="100%" height="100%">
-                   <AreaChart data={[{m:'S1',v:2000,e:1500},{m:'S2',v:2500,e:2200},{m:'S3',v:3000,e:2400},{m:'S4',v:summary.income,e:summary.expenses}]}>
-                      <defs><linearGradient id="colorInc" x1="0" y1="0" x2="0" y2="1"><stop offset="5%" stopColor="#6366f1" stopOpacity={0.1}/><stop offset="95%" stopColor="#6366f1" stopOpacity={0}/></linearGradient></defs>
-                      <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#f1f5f9" />
-                      <XAxis dataKey="m" hide />
-                      <YAxis hide />
-                      <Tooltip />
-                      <Area type="monotone" dataKey="v" stroke="#6366f1" fillOpacity={1} fill="url(#colorInc)" strokeWidth={3} />
-                      <Area type="monotone" dataKey="e" stroke="#ef4444" fill="transparent" strokeWidth={3} />
-                   </AreaChart>
-                </ResponsiveContainer>
-              </div>
-           </div>
-           <div className="grid grid-cols-2 gap-4">
-              <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-100 dark:border-slate-800 flex flex-col justify-between">
-                 <div className="w-8 h-8 bg-indigo-50 dark:bg-indigo-900/30 rounded-lg flex items-center justify-center text-indigo-600 dark:text-indigo-400">
-                    <TrendingUp size={16} />
-                 </div>
-                 <div className="mt-4">
-                    <p className="text-xl font-black text-slate-800 dark:text-white">R$ {summary.income.toLocaleString('pt-BR')}</p>
-                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mt-1">Entradas</p>
-                 </div>
-              </div>
-              <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-100 dark:border-slate-800 flex flex-col justify-between">
-                 <div className="w-8 h-8 bg-rose-50 dark:bg-rose-900/30 rounded-lg flex items-center justify-center text-rose-600 dark:text-rose-400">
-                    <TrendingDown size={16} />
-                 </div>
-                 <div className="mt-4">
-                    <p className="text-xl font-black text-slate-800 dark:text-white">R$ {summary.expenses.toLocaleString('pt-BR')}</p>
-                    <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mt-1">Saídas</p>
-                 </div>
-              </div>
-           </div>
+      {/* Modal de Confirmação de Exclusão Customizado */}
+      {itemToDelete && (
+        <div className="fixed inset-0 bg-slate-950/90 backdrop-blur-sm z-[200] flex items-center justify-center p-6 animate-in fade-in duration-200">
+          <div className="bg-white dark:bg-[#0f172a] w-full max-w-[280px] rounded-[2rem] shadow-2xl p-6 text-center space-y-4 border border-slate-100 dark:border-white/5 animate-in zoom-in duration-300">
+            <div className="w-12 h-12 bg-rose-50 dark:bg-rose-900/20 text-rose-500 rounded-2xl flex items-center justify-center mx-auto">
+              <AlertTriangle size={24} />
+            </div>
+            <div className="space-y-1">
+              <h4 className="font-black text-xs text-slate-800 dark:text-white uppercase tracking-widest">Excluir?</h4>
+              <p className="text-[10px] text-slate-500 dark:text-slate-400 font-bold leading-relaxed">
+                Tem certeza que deseja apagar <span className="text-rose-500">"{itemToDelete.category}"</span>?
+              </p>
+            </div>
+            <div className="grid grid-cols-2 gap-3 pt-2">
+              <button 
+                onClick={() => setItemToDelete(null)}
+                className="py-3.5 rounded-xl text-[9px] font-black uppercase tracking-widest bg-slate-100 dark:bg-white/5 text-slate-500 hover:text-slate-700 transition-colors"
+              >
+                Cancelar
+              </button>
+              <button 
+                onClick={confirmDelete}
+                className="py-3.5 rounded-xl text-[9px] font-black uppercase tracking-widest bg-rose-600 text-white shadow-lg shadow-rose-500/20 active:scale-95 transition-all"
+              >
+                Excluir
+              </button>
+            </div>
+          </div>
         </div>
       )}
 
-      {/* FORMULÁRIO LANÇAR VALORES - REDESIGN PARA SEGUIR A IMAGEM */}
       {isAdding && (
-        <div className="fixed inset-0 bg-slate-950/60 backdrop-blur-sm z-[110] flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-slate-900 w-full max-w-lg rounded-[2.5rem] shadow-2xl animate-in zoom-in duration-300 overflow-hidden">
-            
-            {/* Header com Ícone e Subtítulo */}
-            <div className="px-8 py-6 border-b border-slate-50 dark:border-slate-800 flex justify-between items-center bg-white dark:bg-slate-900">
-              <div className="flex items-center gap-4">
-                <div className={`w-12 h-12 ${type === 'expense' ? 'bg-rose-600' : 'bg-emerald-600'} rounded-2xl flex items-center justify-center text-white shadow-lg shadow-rose-200 dark:shadow-none`}>
-                  {type === 'expense' ? <ArrowDownLeft className="w-6 h-6" /> : <ArrowUpRight className="w-6 h-6" />}
-                </div>
-                <div>
-                   <h3 className="font-black text-xl text-slate-900 dark:text-white leading-tight">Lançar Valores</h3>
-                   <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Controle financeiro da casa</p>
-                </div>
-              </div>
-              <button 
-                onClick={resetForm} 
-                className="p-3 bg-white dark:bg-slate-800 rounded-full shadow-md hover:bg-slate-50 dark:hover:bg-slate-700 transition-all active:scale-90"
-              >
-                <X className="w-5 h-5 text-slate-400" />
-              </button>
+        <div className="fixed inset-0 bg-slate-950/90 backdrop-blur-md z-[150] flex items-center justify-center p-4">
+          <div className="bg-[#0f172a] w-full max-w-sm rounded-[2.5rem] shadow-2xl border border-white/5 flex flex-col max-h-[90vh] overflow-hidden">
+            <div className="px-6 py-4 border-b border-white/5 flex justify-between items-center bg-white/5 shrink-0">
+              <h3 className="font-black text-xs text-white uppercase tracking-widest">{editingItem ? 'Editar' : 'Novo'} Lançamento</h3>
+              <button onClick={resetForm} className="p-2 text-slate-500 hover:text-white transition-colors"><X size={20}/></button>
             </div>
             
-            <form onSubmit={handleSubmit} className="p-8 space-y-6">
-              
-              {/* Toggle Estilo Pílula (Segmented Control) */}
-              <div className="p-1.5 bg-slate-100 dark:bg-slate-800 rounded-full flex items-center">
-                <button 
-                  type="button" 
-                  onClick={() => setType('expense')} 
-                  className={`flex-1 py-3 text-[10px] font-black uppercase tracking-[0.2em] rounded-full transition-all duration-300 ${
-                    type === 'expense' 
-                    ? 'bg-white dark:bg-slate-700 text-rose-600 shadow-md' 
-                    : 'text-slate-400 hover:text-slate-500'
-                  }`}
-                >
-                  Saída
-                </button>
-                <button 
-                  type="button" 
-                  onClick={() => setType('income')} 
-                  className={`flex-1 py-3 text-[10px] font-black uppercase tracking-[0.2em] rounded-full transition-all duration-300 ${
-                    type === 'income' 
-                    ? 'bg-white dark:bg-slate-700 text-emerald-600 shadow-md' 
-                    : 'text-slate-400 hover:text-slate-500'
-                  }`}
-                >
-                  Entrada
-                </button>
+            <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-5 bg-[#0f172a] custom-scrollbar">
+              <div className="p-1 bg-slate-900 border border-white/5 rounded-xl flex">
+                <button type="button" onClick={() => setType('expense')} className={`flex-1 py-2 text-[9px] font-black uppercase rounded-lg transition-all ${type === 'expense' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-500'}`}>Saída</button>
+                <button type="button" onClick={() => setType('income')} className={`flex-1 py-2 text-[9px] font-black uppercase rounded-lg transition-all ${type === 'income' ? 'bg-indigo-600 text-white shadow-sm' : 'text-slate-500'}`}>Entrada</button>
               </div>
 
-              {/* Grid de Campos - Estilo Minimalista */}
-              <div className="grid grid-cols-2 gap-4">
+              <div className="space-y-1.5">
+                <label className="text-[8px] font-black text-slate-500 uppercase ml-1 tracking-widest">Descrição</label>
+                <input type="text" value={category} onChange={e => setCategory(e.target.value)} className="w-full bg-slate-900 border border-white/10 rounded-xl p-3 outline-none font-bold text-xs text-white focus:border-indigo-500" placeholder="Ex: Mercado" required />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
                 <div className="space-y-1.5">
-                  <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Descrição</label>
-                  <input 
-                    type="text" 
-                    value={category} 
-                    onChange={e => setCategory(e.target.value)} 
-                    className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700 rounded-xl p-3.5 text-slate-800 dark:text-white focus:border-indigo-500 outline-none font-bold text-xs" 
-                    placeholder="Ex: Mercado" 
-                    required 
-                  />
+                  <label className="text-[8px] font-black text-slate-500 uppercase ml-1 tracking-widest">Valor</label>
+                  <input type="number" step="0.01" value={value} onChange={e => setValue(e.target.value)} className="w-full bg-slate-900 border border-white/10 rounded-xl p-3 text-xs font-black text-white" placeholder="0,00" required />
                 </div>
                 <div className="space-y-1.5">
-                  <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Valor (R$)</label>
-                  <input 
-                    type="number" 
-                    step="0.01" 
-                    value={value} 
-                    onChange={e => setValue(e.target.value)} 
-                    className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700 rounded-xl p-3.5 text-slate-800 dark:text-white focus:border-indigo-500 outline-none font-black text-sm" 
-                    placeholder="0,00" 
-                    required 
-                  />
+                  <label className="text-[8px] font-black text-slate-500 uppercase ml-1 tracking-widest">Data</label>
+                  <input type="date" value={date} onChange={e => setDate(e.target.value)} className="w-full bg-slate-900 border border-white/10 rounded-xl p-3 text-[10px] font-black text-white" required />
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                  <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Pagamento</label>
-                  <div className="relative">
-                    <select 
-                      value={paymentMethod} 
-                      onChange={e => setPaymentMethod(e.target.value as any)} 
-                      className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700 rounded-xl p-3.5 text-slate-800 dark:text-white focus:border-indigo-500 outline-none font-bold text-xs appearance-none"
-                    >
-                      {PAYMENT_METHODS.map(m => <option key={m.id} value={m.id}>{m.label}</option>)}
-                    </select>
-                    <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-300 pointer-events-none" />
-                  </div>
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Classificação</label>
-                  <div className="relative">
-                    <select 
-                      value={classification} 
-                      onChange={e => setClassification(e.target.value as any)} 
-                      className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700 rounded-xl p-3.5 text-slate-800 dark:text-white focus:border-indigo-500 outline-none font-bold text-xs appearance-none"
-                    >
-                      {CLASSIFICATIONS.map(c => <option key={c.id} value={c.id}>{c.label}</option>)}
-                    </select>
-                    <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-300 pointer-events-none" />
-                  </div>
+              <div className="space-y-1.5">
+                <label className="text-[8px] font-black text-slate-500 uppercase ml-1 tracking-widest">Forma de Pagamento</label>
+                <div className="flex flex-wrap gap-1.5">
+                   {PAYMENT_METHODS.map(m => (
+                     <button key={m.id} type="button" onClick={() => setPaymentMethod(m.id)} className={`px-3 py-2 rounded-lg text-[8px] font-black uppercase border transition-all ${paymentMethod === m.id ? 'bg-indigo-600 border-indigo-600 text-white' : 'bg-slate-900 border-white/10 text-slate-500'}`}>{m.label}</button>
+                   ))}
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                   <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Data</label>
-                   <input 
-                    type="date" 
-                    value={date} 
-                    onChange={e => setDate(e.target.value)} 
-                    className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700 rounded-xl p-3.5 text-slate-800 dark:text-white outline-none focus:border-indigo-500 font-bold text-xs" 
-                    required 
-                   />
-                </div>
-                <div className="space-y-1.5">
-                  <label className="text-[9px] font-black text-slate-400 uppercase tracking-widest ml-1">Vincular Evento</label>
-                  <div className="relative">
-                    <select 
-                      value={linkedEvent} 
-                      onChange={e => setLinkedEvent(e.target.value)} 
-                      className="w-full bg-slate-50 dark:bg-slate-800 border border-slate-100 dark:border-slate-700 rounded-xl p-3.5 text-slate-800 dark:text-white focus:border-indigo-500 outline-none font-bold text-xs appearance-none"
-                    >
-                       <option value="">Opcional</option>
-                       {tasks.slice(0, 10).map(t => <option key={t.id} value={t.id}>{t.title}</option>)}
-                    </select>
-                    <ChevronDown className="absolute right-3 top-1/2 -translate-y-1/2 w-4 h-4 text-slate-300 pointer-events-none" />
-                  </div>
+              <div className="space-y-1.5">
+                <label className="text-[8px] font-black text-slate-500 uppercase ml-1 tracking-widest">Classificação</label>
+                <div className="grid grid-cols-3 gap-2">
+                   {CLASSIFICATIONS.map(c => (
+                     <button key={c.id} type="button" onClick={() => setClassification(c.id)} className={`py-2 rounded-lg text-[8px] font-black uppercase border transition-all ${classification === c.id ? 'bg-indigo-600 border-indigo-600 text-white' : 'bg-slate-900 border-white/10 text-slate-500'}`}>{c.label}</button>
+                   ))}
                 </div>
               </div>
-
-              {/* Botão Principal Estilo Pílula */}
-              <button 
-                type="submit" 
-                className={`w-full py-5 rounded-full font-black text-sm text-white shadow-xl transition-all duration-300 active:scale-95 flex items-center justify-center gap-3 mt-4 ${
-                  type === 'expense' 
-                  ? 'bg-rose-600 hover:bg-rose-700 shadow-rose-200 dark:shadow-none' 
-                  : 'bg-emerald-600 hover:bg-emerald-700 shadow-emerald-200 dark:shadow-none'
-                }`}
-              >
-                <Check className="w-5 h-5" /> Confirmar Lançamento
-              </button>
             </form>
+
+            <div className="px-6 py-5 bg-[#0f172a] border-t border-white/10 shrink-0">
+              <button onClick={handleSubmit} type="button" className="w-full bg-indigo-600 hover:bg-indigo-500 text-white py-4 rounded-2xl font-black text-[10px] uppercase tracking-[0.25em] shadow-xl flex items-center justify-center gap-2 transition-all active:scale-95">
+                 <Check size={18} /> Confirmar
+              </button>
+            </div>
           </div>
         </div>
       )}

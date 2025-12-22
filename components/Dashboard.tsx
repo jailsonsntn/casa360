@@ -17,7 +17,8 @@ import {
   Snowflake,
   MapPin,
   AlertCircle,
-  ExternalLink
+  ExternalLink,
+  Wallet
 } from 'lucide-react';
 import { getWeatherInfo, WeatherData } from '../services/geminiService';
 
@@ -98,6 +99,21 @@ const Dashboard: React.FC<DashboardProps> = ({ state, onAction }) => {
                   <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">{weather.description}</span>
                 </div>
                 <p className="text-[9px] font-bold text-slate-500 mt-0.5 line-clamp-1">{weather.advice}</p>
+                {weather.sources && weather.sources.length > 0 && (
+                  <div className="flex gap-2 mt-1">
+                    {weather.sources.map((s, idx) => (
+                      <a 
+                        key={idx} 
+                        href={s.uri} 
+                        target="_blank" 
+                        rel="noopener noreferrer" 
+                        className="text-[7px] text-indigo-500 hover:underline flex items-center gap-0.5"
+                      >
+                        <ExternalLink size={8} /> Fonte
+                      </a>
+                    ))}
+                  </div>
+                )}
               </div>
             </>
           ) : (
@@ -109,41 +125,68 @@ const Dashboard: React.FC<DashboardProps> = ({ state, onAction }) => {
         </div>
       </header>
 
-      {/* Grid Panorama Tighter */}
+      {/* Grid Panorama */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        <section className="col-span-1 md:col-span-2 bg-slate-900 dark:bg-indigo-600 rounded-3xl p-6 text-white shadow-xl relative overflow-hidden group">
-          <div className="relative z-10 flex flex-col justify-between h-full min-h-[120px]">
-            <div>
-              <p className="text-[9px] font-black uppercase tracking-[0.2em] text-white/50 mb-2">Saldo Geral</p>
-              <h3 className="text-3xl font-black tracking-tighter">R$ {balance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}</h3>
+        {/* CARD SALDO GERAL - DESIGN MELHORADO */}
+        <section className="col-span-1 md:col-span-2 relative overflow-hidden bg-gradient-to-br from-indigo-600 to-violet-700 dark:from-slate-950 dark:to-indigo-900 rounded-[2.5rem] p-8 text-white shadow-2xl shadow-indigo-500/20 group">
+          {/* Decorative Background Elements */}
+          <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2 blur-3xl group-hover:bg-white/15 transition-colors"></div>
+          <div className="absolute bottom-0 left-0 w-32 h-32 bg-indigo-400/20 rounded-full translate-y-1/2 -translate-x-1/2 blur-2xl"></div>
+          
+          <div className="relative z-10 flex flex-col justify-between h-full min-h-[140px]">
+            <div className="flex justify-between items-start">
+              <div>
+                <p className="text-[10px] font-black uppercase tracking-[0.3em] text-white/60 mb-2">Saldo Geral</p>
+                <div className="flex items-baseline gap-2">
+                   <span className="text-lg font-black text-white/50">R$</span>
+                   <h3 className="text-4xl font-black tracking-tighter">
+                     {balance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+                   </h3>
+                </div>
+              </div>
+              <div className="w-12 h-12 bg-white/10 backdrop-blur-md rounded-2xl flex items-center justify-center border border-white/10">
+                <Wallet size={20} className="text-indigo-100" />
+              </div>
             </div>
-            <div className="flex gap-4 mt-4">
-              <span className="text-[9px] font-black uppercase bg-white/10 px-2 py-1 rounded-lg">+ R$ {income.toLocaleString('pt-BR')}</span>
-              <span className="text-[9px] font-black uppercase bg-white/10 px-2 py-1 rounded-lg">- R$ {expenses.toLocaleString('pt-BR')}</span>
+            
+            <div className="flex gap-3 mt-6">
+              <div className="flex items-center gap-2 bg-white/10 backdrop-blur-md px-4 py-2 rounded-xl border border-white/5 hover:bg-white/15 transition-colors">
+                <TrendingUp size={12} className="text-emerald-400" />
+                <span className="text-[10px] font-black uppercase tracking-widest">
+                  + R$ {income.toLocaleString('pt-BR')}
+                </span>
+              </div>
+              <div className="flex items-center gap-2 bg-white/10 backdrop-blur-md px-4 py-2 rounded-xl border border-white/5 hover:bg-white/15 transition-colors">
+                <TrendingDown size={12} className="text-rose-400" />
+                <span className="text-[10px] font-black uppercase tracking-widest">
+                  - R$ {expenses.toLocaleString('pt-BR')}
+                </span>
+              </div>
             </div>
           </div>
         </section>
 
-        <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-100 dark:border-slate-800 flex flex-col justify-between group cursor-pointer hover:border-indigo-200" onClick={onAction}>
+        {/* OUTROS CARDS */}
+        <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-100 dark:border-slate-800 flex flex-col justify-between group cursor-pointer hover:border-indigo-200 transition-all hover:shadow-lg" onClick={onAction}>
           <div className="flex justify-between items-start">
              <div className="w-10 h-10 bg-amber-50 dark:bg-amber-900/30 text-amber-600 rounded-xl flex items-center justify-center">
                 <Clock size={20} />
              </div>
-             <ChevronRight size={16} className="text-slate-300 group-hover:translate-x-1" />
+             <ChevronRight size={16} className="text-slate-300 group-hover:translate-x-1 transition-transform" />
           </div>
           <div className="mt-4">
-             <p className="text-2xl font-black text-slate-800 dark:text-slate-100">{pendingTasks.length}</p>
-             <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Afazeres Pendentes</p>
+             <p className="text-2xl font-black text-slate-800 dark:text-slate-100 leading-none">{pendingTasks.length}</p>
+             <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mt-1">Afazeres Pendentes</p>
           </div>
         </div>
 
-        <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-100 dark:border-slate-800 flex flex-col justify-between">
+        <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-100 dark:border-slate-800 flex flex-col justify-between hover:shadow-lg transition-all">
           <div className="w-10 h-10 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 rounded-xl flex items-center justify-center">
              <CheckCircle size={20} />
           </div>
           <div className="mt-4">
-             <p className="text-2xl font-black text-slate-800 dark:text-slate-100">{state.tasks.length - pendingTasks.length}</p>
-             <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest">Concluídos</p>
+             <p className="text-2xl font-black text-slate-800 dark:text-slate-100 leading-none">{state.tasks.length - pendingTasks.length}</p>
+             <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mt-1">Concluídos</p>
           </div>
         </div>
       </div>
@@ -160,7 +203,7 @@ const Dashboard: React.FC<DashboardProps> = ({ state, onAction }) => {
                 <ArrowRight size={14} className="text-rose-400" />
              </div>
            ) : (
-             <p className="text-[10px] text-slate-300 font-bold text-center py-4">Sem alertas de saúde.</p>
+             <p className="text-[10px] text-slate-300 font-bold text-center py-4 uppercase tracking-widest">Sem alertas de saúde.</p>
            )}
         </section>
 
@@ -170,13 +213,13 @@ const Dashboard: React.FC<DashboardProps> = ({ state, onAction }) => {
               <ShoppingBag size={16} className="text-emerald-500" />
            </div>
            <div className="grid grid-cols-2 gap-2">
-              <div className="p-3 bg-slate-50 dark:bg-slate-800 rounded-xl text-center">
-                 <p className="text-lg font-black text-slate-800 dark:text-white">{pendingShopping.length}</p>
-                 <p className="text-[8px] font-black text-slate-400 uppercase">Faltando</p>
+              <div className="p-3 bg-slate-50 dark:bg-slate-800 rounded-xl text-center border border-transparent hover:border-slate-200 dark:hover:border-slate-700 transition-colors">
+                 <p className="text-lg font-black text-slate-800 dark:text-white leading-none">{pendingShopping.length}</p>
+                 <p className="text-[8px] font-black text-slate-400 uppercase mt-1">Faltando</p>
               </div>
-              <div className="p-3 bg-slate-50 dark:bg-slate-800 rounded-xl text-center">
-                 <p className="text-lg font-black text-slate-800 dark:text-white">{new Set(state.shoppingList.map(s => s.listName)).size}</p>
-                 <p className="text-[8px] font-black text-slate-400 uppercase">Listas</p>
+              <div className="p-3 bg-slate-50 dark:bg-slate-800 rounded-xl text-center border border-transparent hover:border-slate-200 dark:hover:border-slate-700 transition-colors">
+                 <p className="text-lg font-black text-slate-800 dark:text-white leading-none">{new Set(state.shoppingList.map(s => s.listName)).size}</p>
+                 <p className="text-[8px] font-black text-slate-400 uppercase mt-1">Listas</p>
               </div>
            </div>
         </section>

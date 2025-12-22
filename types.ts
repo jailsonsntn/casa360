@@ -5,14 +5,15 @@ export type PriorityLevel = 'low' | 'medium' | 'high';
 export type TransactionType = 'expense' | 'income';
 export type PaymentMethod = 'credit_card' | 'debit_card' | 'cash' | 'transfer' | 'pix';
 export type TransactionClassification = 'fixed' | 'variable' | 'recurring';
+export type AlarmSoundType = 'gentle' | 'standard' | 'urgent';
+export type VibrationIntensity = 'low' | 'medium' | 'high';
 
-// Added TimelineEvent type to fix compilation error in components/TimelineView.tsx
 export interface TimelineEvent {
   id: string;
-  date: string;
-  eventType: 'task' | 'income' | 'expense' | 'reminder';
   title: string;
   description: string;
+  date: string;
+  eventType: 'task' | 'income' | 'expense' | 'reminder';
 }
 
 export interface UserProfile {
@@ -29,6 +30,12 @@ export interface UserProfile {
     zip: string;
   };
   houseName: string;
+  alarmSettings: {
+    soundType: AlarmSoundType;
+    vibrationEnabled: boolean;
+    vibrationIntensity: VibrationIntensity;
+    notificationsEnabled: boolean;
+  };
 }
 
 export interface AuthState {
@@ -52,10 +59,26 @@ export interface Task {
     sound: boolean;
     vibration: boolean;
     triggered: boolean;
+    lastNotified?: string;
   };
   points: number;
   createdAt: string;
-  medicationId?: string;
+}
+
+export interface Medication {
+  id: string;
+  name: string;
+  person: string;
+  dosage: string;
+  frequency: string;
+  stock: number;
+  minStock: number;
+  lastTaken?: string;
+  isActive: boolean;
+  alarmConfig?: {
+    enabled: boolean;
+    nextDose?: string;
+  };
 }
 
 export interface Transaction {
@@ -70,18 +93,7 @@ export interface Transaction {
   classification: TransactionClassification;
   linkedEventId?: string;
   createdAt: string;
-}
-
-export interface Medication {
-  id: string;
-  name: string;
-  person: string;
-  dosage: string;
-  frequency: string;
-  stock: number;
-  minStock: number;
-  lastTaken?: string;
-  isActive: boolean;
+  isForecast?: boolean;
 }
 
 export interface ShoppingItem {
