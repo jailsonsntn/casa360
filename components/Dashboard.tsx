@@ -1,13 +1,13 @@
 
 import React, { useState, useEffect } from 'react';
 import { HomeState } from '../types';
-import { 
-  Clock, 
-  CheckCircle, 
-  TrendingUp, 
-  TrendingDown, 
-  ChevronRight, 
-  HeartPulse, 
+import {
+  Clock,
+  CheckCircle,
+  TrendingUp,
+  TrendingDown,
+  ChevronRight,
+  HeartPulse,
   ShoppingBag,
   ArrowRight,
   Sun,
@@ -74,154 +74,114 @@ const Dashboard: React.FC<DashboardProps> = ({ state, onAction }) => {
   const expenses = state.finance.filter(f => f.type === 'expense').reduce((acc, curr) => acc + curr.value, 0);
   const income = state.finance.filter(f => f.type === 'income').reduce((acc, curr) => acc + curr.value, 0);
   const balance = income - expenses;
-  
+
   const lowStockMeds = state.medications.filter(m => m.stock <= m.minStock);
   const pendingShopping = state.shoppingList.filter(s => !s.isPurchased);
 
   return (
     <div className="space-y-6 animate-in fade-in duration-500">
-      <header className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-        <div>
-          <h2 className="text-xl font-black text-slate-800 dark:text-slate-100 tracking-tight">
-            {getGreeting()}, {state.profile.fullName?.split(' ')[0] || 'Usuário'}
-          </h2>
-          <p className="text-xs text-slate-400 font-medium">Panorama da <span className="font-bold text-slate-600 dark:text-slate-300">{state.profile.houseName || 'residência'}</span></p>
-        </div>
+      <header className="flex flex-col gap-2">
+        <h2 className="text-2xl font-semibold text-zinc-900 dark:text-zinc-100 tracking-tight">
+          {getGreeting()}, {state.profile.fullName?.split(' ')[0]}
+        </h2>
 
-        {/* Weather Compacto */}
-        <div className={`p-4 rounded-2xl border flex items-center gap-4 transition-all ${weather ? getWeatherBg(weather.condition) : 'bg-white dark:bg-slate-900 border-slate-100 dark:border-slate-800'}`}>
-          {weather ? (
-            <>
-              {getWeatherIcon(weather.condition)}
-              <div>
-                <div className="flex items-center gap-2">
-                  <span className="text-lg font-black text-slate-800 dark:text-white leading-none">{weather.temp}</span>
-                  <span className="text-[8px] font-black text-slate-400 uppercase tracking-widest">{weather.description}</span>
-                </div>
-                <p className="text-[9px] font-bold text-slate-500 mt-0.5 line-clamp-1">{weather.advice}</p>
-                {weather.sources && weather.sources.length > 0 && (
-                  <div className="flex gap-2 mt-1">
-                    {weather.sources.map((s, idx) => (
-                      <a 
-                        key={idx} 
-                        href={s.uri} 
-                        target="_blank" 
-                        rel="noopener noreferrer" 
-                        className="text-[7px] text-indigo-500 hover:underline flex items-center gap-0.5"
-                      >
-                        <ExternalLink size={8} /> Fonte
-                      </a>
-                    ))}
-                  </div>
-                )}
-              </div>
-            </>
-          ) : (
-            <div className="flex items-center gap-3 text-slate-300">
-               <MapPin size={18} />
-               <p className="text-[9px] font-black uppercase tracking-widest">Endereço pendente</p>
-            </div>
-          )}
-        </div>
+        {/* Weather Compacto: Clean Bordered Pill */}
+        {weather && (
+          <div className="flex items-center gap-2 text-zinc-500 dark:text-zinc-400 text-sm">
+            {getWeatherIcon(weather.condition)}
+            <span className="font-medium text-zinc-800 dark:text-zinc-200">{weather.temp}</span>
+            <span className="w-1 h-1 bg-zinc-300 rounded-full"></span>
+            <span>{weather.description}</span>
+          </div>
+        )}
       </header>
 
       {/* Grid Panorama */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4">
-        {/* CARD SALDO GERAL - DESIGN MELHORADO */}
-        <section className="col-span-1 md:col-span-2 relative overflow-hidden bg-gradient-to-br from-indigo-600 to-violet-700 dark:from-slate-950 dark:to-indigo-900 rounded-[2.5rem] p-8 text-white shadow-2xl shadow-indigo-500/20 group">
-          {/* Decorative Background Elements */}
-          <div className="absolute top-0 right-0 w-64 h-64 bg-white/10 rounded-full -translate-y-1/2 translate-x-1/2 blur-3xl group-hover:bg-white/15 transition-colors"></div>
-          <div className="absolute bottom-0 left-0 w-32 h-32 bg-indigo-400/20 rounded-full translate-y-1/2 -translate-x-1/2 blur-2xl"></div>
-          
-          <div className="relative z-10 flex flex-col justify-between h-full min-h-[140px]">
-            <div className="flex justify-between items-start">
-              <div>
-                <p className="text-[10px] font-black uppercase tracking-[0.3em] text-white/60 mb-2">Saldo Geral</p>
-                <div className="flex items-baseline gap-2">
-                   <span className="text-lg font-black text-white/50">R$</span>
-                   <h3 className="text-4xl font-black tracking-tighter">
-                     {balance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
-                   </h3>
-                </div>
-              </div>
-              <div className="w-12 h-12 bg-white/10 backdrop-blur-md rounded-2xl flex items-center justify-center border border-white/10">
-                <Wallet size={20} className="text-indigo-100" />
-              </div>
+        {/* SALDO GERAL - Minimalist Finance Card */}
+        <section className="col-span-1 md:col-span-2 relative bg-white dark:bg-zinc-900 rounded-xl border border-zinc-200 dark:border-zinc-800 p-6 shadow-sm">
+          <div className="flex justify-between items-start mb-6">
+            <div>
+              <p className="text-xs font-medium text-zinc-400 uppercase tracking-widest mb-1">Fluxo de Caixa</p>
+              <h3 className="text-3xl font-bold text-zinc-900 dark:text-zinc-100 tracking-tight">
+                R$ {balance.toLocaleString('pt-BR', { minimumFractionDigits: 2 })}
+              </h3>
             </div>
-            
-            <div className="flex gap-3 mt-6">
-              <div className="flex items-center gap-2 bg-white/10 backdrop-blur-md px-4 py-2 rounded-xl border border-white/5 hover:bg-white/15 transition-colors">
-                <TrendingUp size={12} className="text-emerald-400" />
-                <span className="text-[10px] font-black uppercase tracking-widest">
-                  + R$ {income.toLocaleString('pt-BR')}
-                </span>
-              </div>
-              <div className="flex items-center gap-2 bg-white/10 backdrop-blur-md px-4 py-2 rounded-xl border border-white/5 hover:bg-white/15 transition-colors">
-                <TrendingDown size={12} className="text-rose-400" />
-                <span className="text-[10px] font-black uppercase tracking-widest">
-                  - R$ {expenses.toLocaleString('pt-BR')}
-                </span>
-              </div>
+          </div>
+
+          <div className="flex gap-4">
+            <div className="flex-1">
+              <span className="text-xs text-zinc-400">Entradas</span>
+              <p className="text-sm font-semibold text-emerald-600">+ {income.toLocaleString('pt-BR')}</p>
+            </div>
+            <div className="w-px bg-zinc-100 dark:bg-zinc-800"></div>
+            <div className="flex-1">
+              <span className="text-xs text-zinc-400">Saídas</span>
+              <p className="text-sm font-semibold text-rose-600">- {expenses.toLocaleString('pt-BR')}</p>
             </div>
           </div>
         </section>
 
-        {/* OUTROS CARDS */}
-        <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-100 dark:border-slate-800 flex flex-col justify-between group cursor-pointer hover:border-indigo-200 transition-all hover:shadow-lg" onClick={onAction}>
-          <div className="flex justify-between items-start">
-             <div className="w-10 h-10 bg-amber-50 dark:bg-amber-900/30 text-amber-600 rounded-xl flex items-center justify-center">
-                <Clock size={20} />
-             </div>
-             <ChevronRight size={16} className="text-slate-300 group-hover:translate-x-1 transition-transform" />
+        {/* PENDING TASKS - White Card */}
+        <div
+          className="bg-white dark:bg-zinc-900 p-6 rounded-xl border border-zinc-200 dark:border-zinc-800 shadow-sm cursor-pointer hover:border-zinc-300 transition-colors"
+          onClick={onAction}
+        >
+          <div className="flex justify-between items-start mb-4">
+            <Clock size={20} className="text-zinc-400" />
+            <ChevronRight size={16} className="text-zinc-300" />
           </div>
-          <div className="mt-4">
-             <p className="text-2xl font-black text-slate-800 dark:text-slate-100 leading-none">{pendingTasks.length}</p>
-             <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mt-1">Afazeres Pendentes</p>
+          <div>
+            <p className="text-3xl font-bold text-zinc-900 dark:text-zinc-100">{pendingTasks.length}</p>
+            <p className="text-xs text-zinc-500 font-medium">Pendentes</p>
           </div>
         </div>
 
-        <div className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-100 dark:border-slate-800 flex flex-col justify-between hover:shadow-lg transition-all">
-          <div className="w-10 h-10 bg-emerald-50 dark:bg-emerald-900/30 text-emerald-600 rounded-xl flex items-center justify-center">
-             <CheckCircle size={20} />
+        {/* COMPLETED TASKS - White Card */}
+        <div className="bg-white dark:bg-zinc-900 p-6 rounded-xl border border-zinc-200 dark:border-zinc-800 shadow-sm">
+          <div className="flex justify-between items-start mb-4">
+            <CheckCircle size={20} className="text-zinc-400" />
           </div>
-          <div className="mt-4">
-             <p className="text-2xl font-black text-slate-800 dark:text-slate-100 leading-none">{state.tasks.length - pendingTasks.length}</p>
-             <p className="text-[9px] font-black text-slate-400 uppercase tracking-widest mt-1">Concluídos</p>
+          <div>
+            <p className="text-3xl font-bold text-zinc-900 dark:text-zinc-100">{state.tasks.length - pendingTasks.length}</p>
+            <p className="text-xs text-zinc-500 font-medium">Concluídas</p>
           </div>
         </div>
       </div>
 
       <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
-        <section className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-100 dark:border-slate-800">
-           <div className="flex justify-between items-center mb-6">
-              <h3 className="font-black text-slate-400 text-[10px] uppercase tracking-widest">Saúde</h3>
-              <HeartPulse size={16} className="text-rose-500" />
-           </div>
-           {lowStockMeds.length > 0 ? (
-             <div className="p-4 bg-rose-50 dark:bg-rose-900/10 border border-rose-100 dark:border-rose-800 rounded-2xl flex items-center justify-between">
-                <p className="text-[10px] font-bold text-rose-600">Comprar: {lowStockMeds[0].name}</p>
-                <ArrowRight size={14} className="text-rose-400" />
-             </div>
-           ) : (
-             <p className="text-[10px] text-slate-300 font-bold text-center py-4 uppercase tracking-widest">Sem alertas de saúde.</p>
-           )}
+        {/* HEALTH WIDGET */}
+        <section className="bg-white dark:bg-zinc-900 p-6 rounded-xl border border-zinc-200 dark:border-zinc-800 shadow-sm">
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="font-semibold text-zinc-900 dark:text-zinc-100 text-sm">Saúde</h3>
+            <HeartPulse size={16} className="text-zinc-400" />
+          </div>
+          {lowStockMeds.length > 0 ? (
+            <div className="py-2 px-3 bg-rose-50 dark:bg-rose-900/10 text-rose-700 dark:text-rose-300 text-sm rounded-md border border-rose-100 dark:border-rose-800/20 flex items-center justify-between">
+              <span>Comprar: <span className="font-semibold">{lowStockMeds[0].name}</span></span>
+            </div>
+          ) : (
+            <p className="text-sm text-zinc-400">Tudo sob controle.</p>
+          )}
         </section>
 
-        <section className="bg-white dark:bg-slate-900 p-6 rounded-3xl border border-slate-100 dark:border-slate-800">
-           <div className="flex justify-between items-center mb-6">
-              <h3 className="font-black text-slate-400 text-[10px] uppercase tracking-widest">Abastecimento</h3>
-              <ShoppingBag size={16} className="text-emerald-500" />
-           </div>
-           <div className="grid grid-cols-2 gap-2">
-              <div className="p-3 bg-slate-50 dark:bg-slate-800 rounded-xl text-center border border-transparent hover:border-slate-200 dark:hover:border-slate-700 transition-colors">
-                 <p className="text-lg font-black text-slate-800 dark:text-white leading-none">{pendingShopping.length}</p>
-                 <p className="text-[8px] font-black text-slate-400 uppercase mt-1">Faltando</p>
-              </div>
-              <div className="p-3 bg-slate-50 dark:bg-slate-800 rounded-xl text-center border border-transparent hover:border-slate-200 dark:hover:border-slate-700 transition-colors">
-                 <p className="text-lg font-black text-slate-800 dark:text-white leading-none">{new Set(state.shoppingList.map(s => s.listName)).size}</p>
-                 <p className="text-[8px] font-black text-slate-400 uppercase mt-1">Listas</p>
-              </div>
-           </div>
+        {/* SHOPPING WIDGET */}
+        <section className="bg-white dark:bg-zinc-900 p-6 rounded-xl border border-zinc-200 dark:border-zinc-800 shadow-sm">
+          <div className="flex justify-between items-center mb-4">
+            <h3 className="font-semibold text-zinc-900 dark:text-zinc-100 text-sm">Lista de Compras</h3>
+            <ShoppingBag size={16} className="text-zinc-400" />
+          </div>
+          <div className="flex items-center gap-4">
+            <div>
+              <p className="text-2xl font-bold text-zinc-900 dark:text-zinc-100">{pendingShopping.length}</p>
+              <p className="text-xs text-zinc-500">Itens faltantes</p>
+            </div>
+            <div className="w-px h-8 bg-zinc-100 dark:bg-zinc-800"></div>
+            <div>
+              <p className="text-2xl font-bold text-zinc-900 dark:text-zinc-100">{new Set(state.shoppingList.map(s => s.listName)).size}</p>
+              <p className="text-xs text-zinc-500">Listas ativas</p>
+            </div>
+          </div>
         </section>
       </div>
     </div>

@@ -1,9 +1,9 @@
 
 import React, { useState, useEffect, useCallback, useRef } from 'react';
-import { 
-  LayoutDashboard, 
-  Wallet, 
-  Plus, 
+import {
+  LayoutDashboard,
+  Wallet,
+  Plus,
   Settings,
   HeartPulse,
   ShoppingCart,
@@ -63,12 +63,25 @@ const INITIAL_STATE: HomeState = {
 type TabId = 'dashboard' | 'routine' | 'finance' | 'health' | 'shopping' | 'settings';
 
 const App: React.FC = () => {
-  const [activeTab, setActiveTab] = useState<TabId>('dashboard');
+  /* 
+    PERSISTENCE: Restore active tab from localStorage if available.
+    We default to 'dashboard' if no valid tab is found.
+  */
+  const [activeTab, setActiveTabOrig] = useState<TabId>(() => {
+    const saved = localStorage.getItem('casa360_active_tab');
+    return (saved as TabId) || 'dashboard';
+  });
+
+  const setActiveTab = (tab: TabId) => {
+    setActiveTabOrig(tab);
+    localStorage.setItem('casa360_active_tab', tab);
+  };
+
   const [isSidebarOpen, setIsSidebarOpen] = useState(false);
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   const [loadingSession, setLoadingSession] = useState(true);
   const [state, setState] = useState<HomeState>(INITIAL_STATE);
-  
+
   const hasInitialized = useRef(false);
 
   // Monitor de Alarme Central (In-Memory)
@@ -77,12 +90,12 @@ const App: React.FC = () => {
 
     const alarmInterval = setInterval(() => {
       const now = new Date();
-      
+
       state.tasks.forEach(task => {
         if (task.status === 'pending' && task.dueDate && task.alarmConfig?.enabled) {
           const taskDate = new Date(task.dueDate);
           const diffMinutes = (now.getTime() - taskDate.getTime()) / 60000;
-          
+
           if (diffMinutes >= 0 && diffMinutes < 2 && task.alarmConfig.lastNotified !== now.getMinutes().toString()) {
             notificationService.playAlarmSound(state.profile.alarmSettings.soundType);
             if (state.profile.alarmSettings.vibrationEnabled) {
@@ -90,10 +103,10 @@ const App: React.FC = () => {
             }
             notificationService.sendLocalNotification(
               `Tarefa: ${task.title}`,
-              `Horário agendado: ${taskDate.toLocaleTimeString([], {hour: '2-digit', minute:'2-digit'})}`,
+              `Horário agendado: ${taskDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`,
               task.priority === 'high'
             );
-            
+
             setState(p => ({
               ...p,
               tasks: p.tasks.map(t => t.id === task.id ? {
@@ -124,7 +137,7 @@ const App: React.FC = () => {
       const financeRaw = results[2].status === 'fulfilled' && (results[2].value as any)?.data ? (results[2].value as any).data : [];
       const medsRaw = results[3].status === 'fulfilled' && (results[3].value as any)?.data ? (results[3].value as any).data : [];
       const shoppingRaw = results[4].status === 'fulfilled' && (results[4].value as any)?.data ? (results[4].value as any).data : [];
-      
+
       const tasks: Task[] = (tasksRaw || []).map((t: any) => ({
         ...t,
         dueDate: t.due_date || t.dueDate,
@@ -188,6 +201,15 @@ const App: React.FC = () => {
 
   useEffect(() => {
     let mounted = true;
+
+    // SAFETY NET: If session check hangs for more than 5s, we force stop loading
+    const safetyTimeout = setTimeout(() => {
+      if (mounted && loadingSession) {
+        console.warn("Session check timed out, forcing login screen.");
+        setLoadingSession(false);
+      }
+    }, 5000);
+
     const handleAuthChange = async (session: any) => {
       if (!mounted) return;
       if (session?.user) {
@@ -198,7 +220,13 @@ const App: React.FC = () => {
       }
     };
 
-    supabase.auth.getSession().then(({ data: { session } }) => {
+    supabase.auth.getSession().then(({ data: { session }, error }) => {
+      if (error) {
+        console.error("Erro ao obter sessão:", error);
+        setLoadingSession(false);
+        return;
+      }
+
       if (!hasInitialized.current) {
         handleAuthChange(session);
         hasInitialized.current = true;
@@ -217,19 +245,23 @@ const App: React.FC = () => {
       }
     });
 
-    return () => { mounted = false; subscription.unsubscribe(); };
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+      clearTimeout(safetyTimeout);
+    };
   }, [fetchUserData, state.auth.userId]);
 
   const addTask = async (task: Omit<Task, 'id' | 'createdAt'>) => {
     if (!state.auth.userId) return;
     const { data, error } = await supabase.from('tasks').insert([{
-      user_id: state.auth.userId, 
-      title: task.title, 
+      user_id: state.auth.userId,
+      title: task.title,
       description: task.description,
-      responsible: task.responsible, 
-      due_date: task.dueDate, 
+      responsible: task.responsible,
+      due_date: task.dueDate,
       recurrence: task.recurrence,
-      status: task.status, 
+      status: task.status,
       priority: task.priority
     }]).select().single();
 
@@ -237,11 +269,11 @@ const App: React.FC = () => {
       console.error("Erro ao adicionar tarefa:", error.message);
       return;
     }
-    
+
     if (data) {
-      setState(prev => ({ 
-        ...prev, 
-        tasks: [{ ...data, dueDate: data.due_date, alarmConfig: task.alarmConfig || { enabled: false }, createdAt: data.created_at }, ...prev.tasks] 
+      setState(prev => ({
+        ...prev,
+        tasks: [{ ...data, dueDate: data.due_date, alarmConfig: task.alarmConfig || { enabled: false }, createdAt: data.created_at }, ...prev.tasks]
       }));
     }
   };
@@ -256,7 +288,7 @@ const App: React.FC = () => {
     if (updates.priority !== undefined) dbUpdates.priority = updates.priority;
     if (updates.dueDate !== undefined) dbUpdates.due_date = updates.dueDate;
     if (updates.recurrence !== undefined) dbUpdates.recurrence = updates.recurrence;
-    
+
     const { error } = await supabase.from('tasks').update(dbUpdates).eq('id', id);
     if (error) {
       console.error("Erro ao atualizar tarefa:", error.message);
@@ -274,13 +306,13 @@ const App: React.FC = () => {
   const addMedication = async (med: Omit<Medication, 'id' | 'isActive'>) => {
     if (!state.auth.userId) return;
     const { data, error } = await supabase.from('medications').insert([{
-      user_id: state.auth.userId, 
-      name: med.name, 
-      person: med.person, 
+      user_id: state.auth.userId,
+      name: med.name,
+      person: med.person,
       dosage: med.dosage,
-      frequency: med.frequency, 
-      stock: med.stock, 
-      min_stock: med.minStock, 
+      frequency: med.frequency,
+      stock: med.stock,
+      min_stock: med.minStock,
       is_active: true
     }]).select().single();
 
@@ -288,11 +320,11 @@ const App: React.FC = () => {
       console.error("Erro ao adicionar medicamento:", error.message);
       return;
     }
-    
+
     if (data) {
-      setState(p => ({ 
-        ...p, 
-        medications: [...p.medications, { ...data, minStock: data.min_stock, lastTaken: data.last_taken, isActive: data.is_active, alarmConfig: med.alarmConfig || { enabled: false } }] 
+      setState(p => ({
+        ...p,
+        medications: [...p.medications, { ...data, minStock: data.min_stock, lastTaken: data.last_taken, isActive: data.is_active, alarmConfig: med.alarmConfig || { enabled: false } }]
       }));
     }
   };
@@ -307,7 +339,7 @@ const App: React.FC = () => {
     if (updates.isActive !== undefined) dbUpdates.is_active = updates.isActive;
     if (updates.stock !== undefined) dbUpdates.stock = updates.stock;
     if (updates.minStock !== undefined) dbUpdates.min_stock = updates.minStock;
-    
+
     const { error } = await supabase.from('medications').update(dbUpdates).eq('id', id);
     if (error) {
       console.error("Erro ao atualizar medicamento:", error.message);
@@ -385,7 +417,7 @@ const App: React.FC = () => {
       profile: { ...profile },
       theme
     }));
-    
+
     // Aplica o tema visualmente
     if (theme === 'dark') document.documentElement.classList.add('dark');
     else document.documentElement.classList.remove('dark');
@@ -414,7 +446,7 @@ const App: React.FC = () => {
     );
   }
 
-  if (!state.auth.isLoggedIn) return <AuthView onLogin={() => {}} />;
+  if (!state.auth.isLoggedIn) return <AuthView onLogin={() => { }} />;
 
   return (
     <div className="flex min-h-screen bg-slate-50 dark:bg-slate-950 font-sans text-slate-900 dark:text-slate-100 transition-colors duration-300">
@@ -430,9 +462,8 @@ const App: React.FC = () => {
             <button
               key={item.id}
               onClick={() => { setActiveTab(item.id as TabId); setIsSidebarOpen(false); }}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all ${
-                activeTab === item.id ? 'bg-indigo-50 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-300 shadow-sm border border-indigo-100/50 dark:border-indigo-800/30' : 'text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'
-              } ${isSidebarCollapsed ? 'justify-center' : ''}`}
+              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all ${activeTab === item.id ? 'bg-indigo-50 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-300 shadow-sm border border-indigo-100/50 dark:border-indigo-800/30' : 'text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'
+                } ${isSidebarCollapsed ? 'justify-center' : ''}`}
             >
               {item.icon}
               {!isSidebarCollapsed && <span className="text-xs font-bold">{item.label}</span>}
@@ -441,8 +472,8 @@ const App: React.FC = () => {
         </nav>
         <div className="p-3 border-t border-slate-100 dark:border-slate-800">
           <button onClick={() => supabase.auth.signOut()} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/10 font-bold transition-all ${isSidebarCollapsed ? 'justify-center' : ''}`}>
-             <LogOut size={18} />
-             {!isSidebarCollapsed && <span className="text-xs">Sair</span>}
+            <LogOut size={18} />
+            {!isSidebarCollapsed && <span className="text-xs">Sair</span>}
           </button>
         </div>
       </aside>
@@ -456,13 +487,13 @@ const App: React.FC = () => {
             </h2>
           </div>
           <div className="flex items-center gap-3">
-             <div className="text-right hidden sm:block">
-                <p className="text-[10px] font-black text-slate-800 dark:text-slate-200 leading-none">{state.profile.fullName.split(' ')[0]}</p>
-                <p className="text-[8px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-widest">Casa Ativa</p>
-             </div>
-             <button onClick={() => setActiveTab('settings')} className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center text-white font-black text-xs border border-white dark:border-slate-800 shadow-sm overflow-hidden">
-                {state.profile.profileImage ? <img src={state.profile.profileImage} alt="P" className="w-full h-full object-cover" /> : state.profile.fullName.charAt(0)}
-             </button>
+            <div className="text-right hidden sm:block">
+              <p className="text-[10px] font-black text-slate-800 dark:text-slate-200 leading-none">{state.profile.fullName.split(' ')[0]}</p>
+              <p className="text-[8px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-widest">Casa Ativa</p>
+            </div>
+            <button onClick={() => setActiveTab('settings')} className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center text-white font-black text-xs border border-white dark:border-slate-800 shadow-sm overflow-hidden">
+              {state.profile.profileImage ? <img src={state.profile.profileImage} alt="P" className="w-full h-full object-cover" /> : state.profile.fullName.charAt(0)}
+            </button>
           </div>
         </header>
 
