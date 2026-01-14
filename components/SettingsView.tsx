@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { HomeState, UserProfile, AlarmSoundType, VibrationIntensity } from '../types';
+import { HomeState, UserProfile, AlarmSoundType, VibrationIntensity, CreditCard } from '../types';
 import {
   User,
   MapPin,
@@ -24,7 +24,11 @@ import {
   BellRing,
   Info,
   Waves,
-  Music
+  Music,
+  CreditCard as CreditCardIcon,
+  Plus,
+  Edit,
+  Trash2
 } from 'lucide-react';
 import { notificationService } from '../services/notificationService';
 
@@ -51,9 +55,79 @@ const InputField = ({ label, icon, value, onChange, placeholder, type = "text" }
 
 const SettingsView: React.FC<SettingsViewProps> = ({ state, onUpdate, onLogout }) => {
   const [localProfile, setLocalProfile] = useState<UserProfile>(state.profile);
-  const [activeTab, setActiveTab] = useState<'data' | 'alarms' | 'system'>('data');
+  const [activeTab, setActiveTab] = useState<'data' | 'cards' | 'alarms' | 'system'>('data');
   const [showSavedToast, setShowSavedToast] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Estados para gerenciamento de cartões
+  const [showCardModal, setShowCardModal] = useState(false);
+  const [editingCard, setEditingCard] = useState<CreditCard | null>(null);
+  const [cardName, setCardName] = useState('');
+  const [cardOwner, setCardOwner] = useState('');
+  const [cardType, setCardType] = useState('');
+  const [lastFourDigits, setLastFourDigits] = useState('');
+  const [cardColor, setCardColor] = useState('#6366f1');
+
+  const resetCardForm = () => {
+    setCardName('');
+    setCardOwner('');
+    setCardType('');
+    setLastFourDigits('');
+    setCardColor('#6366f1');
+    setEditingCard(null);
+    setShowCardModal(false);
+  };
+
+  const handleAddCard = () => {
+    resetCardForm();
+    setShowCardModal(true);
+  };
+
+  const handleEditCard = (card: CreditCard) => {
+    setEditingCard(card);
+    setCardName(card.name);
+    setCardOwner(card.owner);
+    setCardType(card.cardType || '');
+    setLastFourDigits(card.lastFourDigits || '');
+    setCardColor(card.color);
+    setShowCardModal(true);
+  };
+
+  const handleSaveCard = () => {
+    if (!cardName.trim() || !cardOwner.trim()) return;
+
+    const cardData: CreditCard = {
+      id: editingCard?.id || `card-${Date.now()}`,
+      name: cardName.trim(),
+      owner: cardOwner.trim(),
+      cardType: cardType || undefined,
+      lastFourDigits: lastFourDigits || undefined,
+      color: cardColor,
+      isActive: true,
+      createdAt: editingCard?.createdAt || new Date().toISOString()
+    };
+
+    let updatedCards;
+    if (editingCard) {
+      // Editar cartão existente
+      updatedCards = state.creditCards.map(card =>
+        card.id === editingCard.id ? cardData : card
+      );
+    } else {
+      // Adicionar novo cartão
+      updatedCards = [...state.creditCards, cardData];
+    }
+
+    onUpdate({ ...state, creditCards: updatedCards });
+    resetCardForm();
+    setShowSavedToast(true);
+    setTimeout(() => setShowSavedToast(false), 3000);
+  };
+
+  const handleDeleteCard = (cardId: string) => {
+    const updatedCards = state.creditCards.filter(card => card.id !== cardId);
+    onUpdate({ ...state, creditCards: updatedCards });
+  };
 
   useEffect(() => {
     setLocalProfile(state.profile);
@@ -106,9 +180,9 @@ const SettingsView: React.FC<SettingsViewProps> = ({ state, onUpdate, onLogout }
       </div>
 
       <div className="flex p-1 bg-zinc-100 dark:bg-zinc-800/50 rounded-xl">
-        {(['data', 'alarms', 'system'] as const).map(tab => (
+        {(['data', 'cards', 'alarms', 'system'] as const).map(tab => (
           <button key={tab} onClick={() => setActiveTab(tab)} className={`flex-1 flex items-center justify-center gap-2 px-3 py-2.5 rounded-lg text-xs font-semibold uppercase tracking-wide transition-all ${activeTab === tab ? 'bg-white dark:bg-zinc-900 text-indigo-600 shadow-sm border border-zinc-200 dark:border-zinc-800' : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'}`}>
-            <span>{tab === 'data' ? 'Meus Dados' : tab === 'alarms' ? 'Alarmes' : 'Sistema'}</span>
+            <span>{tab === 'data' ? 'Meus Dados' : tab === 'cards' ? 'Cartões' : tab === 'alarms' ? 'Alarmes' : 'Sistema'}</span>
           </button>
         ))}
       </div>
@@ -146,6 +220,57 @@ const SettingsView: React.FC<SettingsViewProps> = ({ state, onUpdate, onLogout }
                   </div>
                 </div>
               </div>
+            </div>
+          </div>
+        )}
+
+        {activeTab === 'cards' && (
+          <div className="space-y-6 animate-in slide-in-from-bottom-2 duration-300">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div className="p-2 bg-indigo-50 dark:bg-indigo-900/30 rounded-lg text-indigo-600 dark:text-indigo-400">
+                  <CreditCardIcon size={18} />
+                </div>
+                <h4 className="text-xs font-bold uppercase tracking-wider text-zinc-500">Cartões de Crédito</h4>
+              </div>
+              <button onClick={handleAddCard} className="bg-indigo-600 text-white px-4 py-2 rounded-lg text-xs font-semibold flex items-center gap-2 hover:bg-indigo-700 transition-colors">
+                <Plus size={14} /> Novo Cartão
+              </button>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {state.creditCards.map(card => (
+                <div key={card.id} className="p-4 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl text-white relative overflow-hidden">
+                  <div className="absolute top-0 right-0 w-20 h-20 bg-white/10 rounded-full -mr-10 -mt-10"></div>
+                  <div className="relative z-10">
+                    <div className="flex items-center justify-between mb-3">
+                      <span className="text-sm font-bold opacity-90">{card.name}</span>
+                      <div className="flex gap-1">
+                        <button onClick={() => handleEditCard(card)} className="p-1 hover:bg-white/20 rounded transition-colors">
+                          <Edit size={12} />
+                        </button>
+                        <button onClick={() => handleDeleteCard(card.id)} className="p-1 hover:bg-white/20 rounded transition-colors">
+                          <Trash2 size={12} />
+                        </button>
+                      </div>
+                    </div>
+                    <div className="text-xs opacity-75 mb-2">{card.owner}</div>
+                    <div className="text-lg font-mono tracking-wider">
+                      **** **** **** {card.lastFourDigits || '****'}
+                    </div>
+                    {card.cardType && (
+                      <div className="text-xs opacity-75 mt-2">{card.cardType}</div>
+                    )}
+                  </div>
+                </div>
+              ))}
+              {state.creditCards.length === 0 && (
+                <div className="col-span-full text-center py-12 text-zinc-400">
+                  <CreditCardIcon size={48} className="mx-auto mb-4 opacity-50" />
+                  <p className="text-sm">Nenhum cartão cadastrado</p>
+                  <p className="text-xs mt-1">Adicione seus cartões para controlar melhor suas finanças</p>
+                </div>
+              )}
             </div>
           </div>
         )}
@@ -217,6 +342,103 @@ const SettingsView: React.FC<SettingsViewProps> = ({ state, onUpdate, onLogout }
           </div>
         )}
       </div>
+
+      {/* Modal para Adicionar/Editar Cartão */}
+      {showCardModal && (
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[150] flex items-center justify-center p-4">
+          <div className="bg-white dark:bg-zinc-900 w-full max-w-md rounded-3xl shadow-2xl border border-zinc-200 dark:border-zinc-800 flex flex-col max-h-[90vh] overflow-hidden">
+            <div className="px-6 py-5 border-b border-zinc-100 dark:border-zinc-800 flex justify-between items-center">
+              <h3 className="font-semibold text-base text-zinc-900 dark:text-zinc-100">
+                {editingCard ? 'Editar' : 'Novo'} Cartão
+              </h3>
+              <button onClick={resetCardForm} className="p-2 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 transition-colors rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800">
+                <X size={20} />
+              </button>
+            </div>
+
+            <form onSubmit={(e) => { e.preventDefault(); handleSaveCard(); }} className="flex-1 overflow-y-auto p-6 space-y-6">
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Nome do Cartão</label>
+                <input
+                  type="text"
+                  value={cardName}
+                  onChange={e => setCardName(e.target.value)}
+                  className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl px-4 py-3 outline-none font-medium text-sm text-zinc-900 dark:text-zinc-100 focus:border-indigo-500 transition-colors"
+                  placeholder="Ex: Nubank, C6 Bank, Mercado Pago"
+                  required
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Proprietário</label>
+                  <select
+                    value={cardOwner}
+                    onChange={e => setCardOwner(e.target.value)}
+                    className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl px-4 py-3 outline-none font-medium text-sm text-zinc-900 dark:text-zinc-100 focus:border-indigo-500 transition-colors"
+                    required
+                  >
+                    <option value="">Selecione</option>
+                    <option value="Pauliane">Pauliane</option>
+                    <option value="Jailson">Jailson</option>
+                  </select>
+                </div>
+                <div className="space-y-2">
+                  <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Tipo</label>
+                  <select
+                    value={cardType}
+                    onChange={e => setCardType(e.target.value)}
+                    className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl px-4 py-3 outline-none font-medium text-sm text-zinc-900 dark:text-zinc-100 focus:border-indigo-500 transition-colors"
+                  >
+                    <option value="">Selecione</option>
+                    <option value="Visa">Visa</option>
+                    <option value="Mastercard">Mastercard</option>
+                    <option value="Elo">Elo</option>
+                    <option value="American Express">American Express</option>
+                  </select>
+                </div>
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Últimos 4 dígitos</label>
+                <input
+                  type="text"
+                  value={lastFourDigits}
+                  onChange={e => setLastFourDigits(e.target.value.replace(/\D/g, '').slice(0, 4))}
+                  className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl px-4 py-3 outline-none font-medium text-sm text-zinc-900 dark:text-zinc-100 focus:border-indigo-500 transition-colors"
+                  placeholder="1234"
+                  maxLength={4}
+                />
+              </div>
+
+              <div className="space-y-2">
+                <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Cor do Cartão</label>
+                <div className="flex gap-2 flex-wrap">
+                  {['#6366f1', '#ec4899', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#84cc16'].map(color => (
+                    <button
+                      key={color}
+                      type="button"
+                      onClick={() => setCardColor(color)}
+                      className={`w-8 h-8 rounded-full border-2 transition-all ${cardColor === color ? 'border-zinc-900 dark:border-zinc-100 scale-110' : 'border-zinc-300 dark:border-zinc-600'}`}
+                      style={{ backgroundColor: color }}
+                    />
+                  ))}
+                </div>
+              </div>
+            </form>
+
+            <div className="px-6 py-5 bg-white dark:bg-zinc-900 border-t border-zinc-100 dark:border-zinc-800">
+              <button
+                onClick={handleSaveCard}
+                className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-xl font-semibold text-sm shadow-sm flex items-center justify-center gap-2 transition-all active:scale-95"
+              >
+                <Save size={18} /> Salvar Cartão
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       {showSavedToast && <div className="fixed bottom-10 left-1/2 -translate-x-1/2 bg-zinc-900 dark:bg-indigo-600 text-white px-6 py-3 rounded-full text-xs font-bold uppercase tracking-wider shadow-xl animate-in fade-in slide-in-from-bottom border border-white/10 z-[200]">Configurações Salvas</div>}
     </div>
   );

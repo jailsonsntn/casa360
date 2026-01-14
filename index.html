@@ -21,13 +21,27 @@
           fontFamily: {
             sans: ['Inter', 'sans-serif'],
           },
+          animation: {
+            'fade-in': 'fadeIn 0.5s ease-in-out',
+            'slide-in': 'slideIn 0.3s ease-out',
+          },
+          keyframes: {
+            fadeIn: {
+              '0%': { opacity: '0' },
+              '100%': { opacity: '1' },
+            },
+            slideIn: {
+              '0%': { transform: 'translateY(-10px)', opacity: '0' },
+              '100%': { transform: 'translateY(0)', opacity: '1' },
+            },
+          },
         },
       },
     }
   </script>
   <style>
     body {
-      transition: background-color 0.2s ease;
+      transition: background-color 0.3s ease;
     }
 
     .no-scrollbar::-webkit-scrollbar {
@@ -37,6 +51,24 @@
     .no-scrollbar {
       -ms-overflow-style: none;
       scrollbar-width: none;
+    }
+
+    .animate-fade-in {
+      animation: fadeIn 0.5s ease-in-out;
+    }
+
+    .animate-slide-in {
+      animation: slideIn 0.3s ease-out;
+    }
+
+    @keyframes fadeIn {
+      0% { opacity: 0; }
+      100% { opacity: 1; }
+    }
+
+    @keyframes slideIn {
+      0% { transform: translateY(-10px); opacity: 0; }
+      100% { transform: translateY(0); opacity: 1; }
     }
   </style>
   <script type="importmap">

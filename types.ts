@@ -7,6 +7,9 @@ export type PaymentMethod = 'credit_card' | 'debit_card' | 'cash' | 'transfer' |
 export type TransactionClassification = 'fixed' | 'variable' | 'recurring';
 export type AlarmSoundType = 'gentle' | 'standard' | 'urgent';
 export type VibrationIntensity = 'low' | 'medium' | 'high';
+export type InvestmentType = 'stock' | 'crypto' | 'fund' | 'real_estate' | 'other';
+export type GoalPriority = 'low' | 'medium' | 'high';
+export type GoalCategory = 'emergency_fund' | 'vacation' | 'car' | 'house' | 'other';
 
 export interface TimelineEvent {
   id: string;
@@ -77,6 +80,7 @@ export interface Medication {
   isActive: boolean;
   alarmConfig?: {
     enabled: boolean;
+    times?: string[];
     nextDose?: string;
   };
 }
@@ -90,6 +94,7 @@ export interface Transaction {
   recurring: boolean;
   notes: string;
   paymentMethod: PaymentMethod;
+  creditCardId?: string; // Reference to specific credit card
   classification: TransactionClassification;
   linkedEventId?: string;
   createdAt: string;
@@ -116,6 +121,44 @@ export interface Reminder {
   title: string;
 }
 
+export interface CreditCard {
+  id: string;
+  name: string;
+  owner: string;
+  cardType?: string;
+  lastFourDigits?: string;
+  color: string;
+  isActive: boolean;
+  createdAt: string;
+}
+
+export interface Investment {
+  id: string;
+  type: InvestmentType;
+  name: string;
+  symbol?: string;
+  quantity?: number;
+  purchasePrice?: number;
+  currentPrice?: number;
+  totalInvested?: number;
+  currentValue?: number;
+  purchaseDate?: string;
+  notes?: string;
+  createdAt: string;
+}
+
+export interface FinancialGoal {
+  id: string;
+  name: string;
+  targetAmount: number;
+  currentAmount: number;
+  targetDate?: string;
+  category: GoalCategory;
+  priority: GoalPriority;
+  isCompleted: boolean;
+  createdAt: string;
+}
+
 export interface HomeState {
   auth: AuthState;
   profile: UserProfile;
@@ -124,6 +167,9 @@ export interface HomeState {
   reminders: Reminder[];
   medications: Medication[];
   shoppingList: ShoppingItem[];
+  creditCards: CreditCard[];
+  investments: Investment[];
+  financialGoals: FinancialGoal[];
   userPoints: number;
   theme: 'light' | 'dark';
 }

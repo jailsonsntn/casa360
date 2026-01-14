@@ -114,17 +114,61 @@ alter table shopping_items enable row level security;
 create policy "Users can CRUD own shopping items" on shopping_items
   for all using (auth.uid() = user_id);
 
--- Function to handle new user profile creation automatically
-create or replace function public.handle_new_user()
-returns trigger as $$
-begin
-  insert into public.profiles (id, email, full_name, house_name)
-  values (new.id, new.email, new.raw_user_meta_data->>'full_name', 'Minha Casa');
-  return new;
-end;
-$$ language plpgsql security definer;
+-- CREDIT CARDS TABLE
+create table credit_cards (
+  id uuid default uuid_generate_v4() primary key,
+  user_id uuid references auth.users on delete cascade not null,
+  name text not null, -- e.g., "Nubank", "C6 Bank", "Mercado Pago"
+  owner text not null, -- e.g., "Pauliane", "Jailson"
+  card_type text, -- e.g., "Visa", "Mastercard", "Elo"
+  last_four_digits text, -- last 4 digits for identification
+  color text default '#6366f1', -- hex color for UI
+  is_active boolean default true,
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null
+);
 
--- Trigger to create profile on signup
-create or replace trigger on_auth_user_created
-  after insert on auth.users
-  for each row execute procedure public.handle_new_user();
+alter table credit_cards enable row level security;
+
+create policy "Users can CRUD own credit cards" on credit_cards
+  for all using (auth.uid() = user_id);
+
+-- INVESTMENTS TABLE
+create table investments (
+  id uuid default uuid_generate_v4() primary key,
+  user_id uuid references auth.users on delete cascade not null,
+  type text not null, -- 'stock', 'crypto', 'fund', 'real_estate', 'other'
+  name text not null,
+  symbol text, -- stock ticker or crypto symbol
+  quantity numeric,
+  purchase_price numeric,
+  current_price numeric,
+  total_invested numeric,
+  current_value numeric,
+  purchase_date date,
+  notes text,
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null
+);
+
+alter table investments enable row level security;
+
+create policy "Users can CRUD own investments" on investments
+  for all using (auth.uid() = user_id);
+
+-- FINANCIAL GOALS TABLE
+create table financial_goals (
+  id uuid default uuid_generate_v4() primary key,
+  user_id uuid references auth.users on delete cascade not null,
+  name text not null,
+  target_amount numeric not null,
+  current_amount numeric default 0,
+  target_date date,
+  category text, -- 'emergency_fund', 'vacation', 'car', 'house', 'other'
+  priority text default 'medium', -- 'low', 'medium', 'high'
+  is_completed boolean default false,
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null
+);
+
+alter table financial_goals enable row level security;
+
+create policy "Users can CRUD own financial goals" on financial_goals
+  for all using (auth.uid() = user_id);

@@ -21,7 +21,7 @@ import {
   ShieldAlert,
   Bell
 } from 'lucide-react';
-import { Task, Transaction, HomeState, Medication, UserProfile, AuthState, ShoppingItem } from './types';
+import { Task, Transaction, HomeState, Medication, UserProfile, AuthState, ShoppingItem, CreditCard, Investment, FinancialGoal } from './types';
 import Dashboard from './components/Dashboard';
 import RoutineView from './components/RoutineView';
 import FinanceView from './components/FinanceView';
@@ -56,6 +56,9 @@ const INITIAL_STATE: HomeState = {
   medications: [],
   shoppingList: [],
   reminders: [],
+  creditCards: [],
+  investments: [],
+  financialGoals: [],
   userPoints: 0,
   theme: 'light'
 };
@@ -129,7 +132,10 @@ const App: React.FC = () => {
         supabase.from('tasks').select('*').eq('user_id', userId).order('created_at', { ascending: false }),
         supabase.from('finance').select('*').eq('user_id', userId).order('created_at', { ascending: false }),
         supabase.from('medications').select('*').eq('user_id', userId).order('name', { ascending: true }),
-        supabase.from('shopping_items').select('*').eq('user_id', userId)
+        supabase.from('shopping_items').select('*').eq('user_id', userId),
+        supabase.from('credit_cards').select('*').eq('user_id', userId).order('created_at', { ascending: false }),
+        supabase.from('investments').select('*').eq('user_id', userId).order('created_at', { ascending: false }),
+        supabase.from('financial_goals').select('*').eq('user_id', userId).order('created_at', { ascending: false })
       ]);
 
       const profileData = results[0].status === 'fulfilled' && (results[0].value as any)?.data ? (results[0].value as any).data : null;
@@ -137,6 +143,9 @@ const App: React.FC = () => {
       const financeRaw = results[2].status === 'fulfilled' && (results[2].value as any)?.data ? (results[2].value as any).data : [];
       const medsRaw = results[3].status === 'fulfilled' && (results[3].value as any)?.data ? (results[3].value as any).data : [];
       const shoppingRaw = results[4].status === 'fulfilled' && (results[4].value as any)?.data ? (results[4].value as any).data : [];
+      const creditCardsRaw = results[5].status === 'fulfilled' && (results[5].value as any)?.data ? (results[5].value as any).data : [];
+      const investmentsRaw = results[6].status === 'fulfilled' && (results[6].value as any)?.data ? (results[6].value as any).data : [];
+      const goalsRaw = results[7].status === 'fulfilled' && (results[7].value as any)?.data ? (results[7].value as any).data : [];
 
       const tasks: Task[] = (tasksRaw || []).map((t: any) => ({
         ...t,
@@ -167,6 +176,31 @@ const App: React.FC = () => {
         listName: s.list_name || s.listName
       }));
 
+      const creditCards: CreditCard[] = (creditCardsRaw || []).map((c: any) => ({
+        ...c,
+        cardType: c.card_type || c.cardType,
+        lastFourDigits: c.last_four_digits || c.lastFourDigits,
+        isActive: c.is_active !== undefined ? c.is_active : c.isActive,
+        createdAt: c.created_at || c.createdAt
+      }));
+
+      const investments: Investment[] = (investmentsRaw || []).map((i: any) => ({
+        ...i,
+        purchaseDate: i.purchase_date || i.purchaseDate,
+        totalInvested: i.total_invested || i.totalInvested,
+        currentValue: i.current_value || i.currentValue,
+        createdAt: i.created_at || i.createdAt
+      }));
+
+      const financialGoals: FinancialGoal[] = (goalsRaw || []).map((g: any) => ({
+        ...g,
+        targetAmount: g.target_amount || g.targetAmount,
+        currentAmount: g.current_amount || g.currentAmount,
+        targetDate: g.target_date || g.targetDate,
+        isCompleted: g.is_completed !== undefined ? g.is_completed : g.isCompleted,
+        createdAt: g.created_at || g.createdAt
+      }));
+
       setState(prev => ({
         ...prev,
         auth: { isLoggedIn: true, userEmail: email, userId: userId, lastLogin: new Date().toISOString() },
@@ -190,6 +224,9 @@ const App: React.FC = () => {
         finance,
         medications,
         shoppingList,
+        creditCards,
+        investments,
+        financialGoals,
         theme: profileData?.theme || prev.theme
       }));
     } catch (err) {
@@ -396,15 +433,21 @@ const App: React.FC = () => {
   const updateProfile = async (profile: UserProfile, theme: 'light' | 'dark') => {
     if (!state.auth.userId) return;
 
-    // RESILIÊNCIA: Omitimos colunas que podem não existir no banco do usuário
-    // para evitar o erro "Could not find column ... in the schema cache"
     const { error } = await supabase.from('profiles').upsert({
       id: state.auth.userId,
       full_name: profile.fullName,
       email: profile.email,
+      birth_date: profile.birthDate,
+      phone: profile.phone,
       house_name: profile.houseName,
-      theme: theme
-      // Removidos alarm_settings e campos de endereço por segurança
+      profile_image: profile.profileImage,
+      theme: theme,
+      address_street: profile.address.street,
+      address_number: profile.address.number,
+      address_city: profile.address.city,
+      address_state: profile.address.state,
+      address_zip: profile.address.zip,
+      alarm_settings: profile.alarmSettings
     });
 
     if (error) {
@@ -439,9 +482,12 @@ const App: React.FC = () => {
 
   if (loadingSession) {
     return (
-      <div className="fixed inset-0 bg-white dark:bg-slate-950 flex flex-col items-center justify-center gap-4 z-[200]">
-        <Loader2 className="w-8 h-8 text-indigo-600 animate-spin" />
-        <p className="text-[10px] font-black text-slate-400 uppercase tracking-widest">Sincronizando</p>
+      <div className="fixed inset-0 bg-gradient-to-br from-indigo-50 via-blue-50 to-purple-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-800 flex flex-col items-center justify-center gap-6 z-[200] animate-fade-in">
+        <div className="relative">
+          <Loader2 className="w-12 h-12 text-indigo-600 animate-spin" />
+          <div className="absolute inset-0 w-12 h-12 border-4 border-purple-300 rounded-full animate-ping opacity-20"></div>
+        </div>
+        <p className="text-sm font-medium text-slate-600 dark:text-slate-400 uppercase tracking-widest animate-pulse">Sincronizando</p>
       </div>
     );
   }
@@ -449,10 +495,10 @@ const App: React.FC = () => {
   if (!state.auth.isLoggedIn) return <AuthView onLogin={() => { }} />;
 
   return (
-    <div className="flex min-h-screen bg-slate-50 dark:bg-slate-950 font-sans text-slate-900 dark:text-slate-100 transition-colors duration-300">
-      <aside className={`hidden md:flex flex-col bg-white dark:bg-slate-900 border-r border-slate-200 dark:border-slate-800 fixed h-full z-20 transition-all duration-300 ${isSidebarCollapsed ? 'w-16' : 'w-56'}`}>
+    <div className="flex min-h-screen bg-slate-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-800 font-sans text-slate-900 dark:text-slate-100 transition-all duration-500">
+      <aside className={`hidden md:flex flex-col bg-white dark:from-slate-900 dark:to-slate-800 border-r border-slate-200 dark:border-slate-700 fixed h-full z-20 transition-all duration-300 shadow-lg ${isSidebarCollapsed ? 'w-16' : 'w-56'}`}>
         <div className={`p-5 border-b border-slate-100 dark:border-slate-800 flex items-center ${isSidebarCollapsed ? 'justify-center' : 'justify-between'}`}>
-          {!isSidebarCollapsed && <h1 className="text-sm font-black text-indigo-600 dark:text-indigo-400 truncate tracking-tight">{state.profile.houseName || 'Casa360'}</h1>}
+          {!isSidebarCollapsed && <h1 className="text-sm font-semibold text-indigo-600 dark:text-indigo-400 truncate tracking-tight">{state.profile.houseName || 'Casa360'}</h1>}
           <button onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)} className="p-1 text-slate-300">
             {isSidebarCollapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
           </button>
@@ -462,16 +508,16 @@ const App: React.FC = () => {
             <button
               key={item.id}
               onClick={() => { setActiveTab(item.id as TabId); setIsSidebarOpen(false); }}
-              className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl transition-all ${activeTab === item.id ? 'bg-indigo-50 dark:bg-indigo-900/40 text-indigo-600 dark:text-indigo-300 shadow-sm border border-indigo-100/50 dark:border-indigo-800/30' : 'text-slate-400 hover:bg-slate-50 dark:hover:bg-slate-800'
+              className={`w-full flex items-center gap-3 px-3 py-3 rounded-xl transition-all duration-200 hover:scale-105 ${activeTab === item.id ? 'bg-gradient-to-r from-indigo-500 to-purple-600 text-white shadow-lg border border-indigo-400/50' : 'text-slate-500 hover:bg-gradient-to-r hover:from-slate-100 hover:to-slate-200 dark:hover:from-slate-700 dark:hover:to-slate-600 hover:text-slate-700 dark:hover:text-slate-300'
                 } ${isSidebarCollapsed ? 'justify-center' : ''}`}
             >
               {item.icon}
-              {!isSidebarCollapsed && <span className="text-xs font-bold">{item.label}</span>}
+              {!isSidebarCollapsed && <span className="text-xs font-medium">{item.label}</span>}
             </button>
           ))}
         </nav>
         <div className="p-3 border-t border-slate-100 dark:border-slate-800">
-          <button onClick={() => supabase.auth.signOut()} className={`w-full flex items-center gap-3 px-3 py-2.5 rounded-xl text-rose-500 hover:bg-rose-50 dark:hover:bg-rose-900/10 font-bold transition-all ${isSidebarCollapsed ? 'justify-center' : ''}`}>
+          <button onClick={() => supabase.auth.signOut()} className={`w-full flex items-center gap-3 px-3 py-3 rounded-xl text-rose-500 hover:bg-rose-50 dark:hover:from-rose-900/20 dark:hover:to-rose-800/20 font-medium transition-all duration-200 hover:scale-105 ${isSidebarCollapsed ? 'justify-center' : ''}`}>
             <LogOut size={18} />
             {!isSidebarCollapsed && <span className="text-xs">Sair</span>}
           </button>
@@ -479,19 +525,19 @@ const App: React.FC = () => {
       </aside>
 
       <div className={`flex-1 flex flex-col min-w-0 transition-all duration-300 ${isSidebarCollapsed ? 'md:ml-16' : 'md:ml-56'}`}>
-        <header className="sticky top-0 z-10 bg-white/70 dark:bg-slate-900/70 backdrop-blur-md border-b border-slate-200/50 dark:border-slate-800/50 px-4 md:px-6 py-3 flex justify-between items-center">
+        <header className="sticky top-0 z-10 bg-white/90 dark:from-slate-900/80 dark:to-slate-800/80 backdrop-blur-lg border-b border-slate-200 dark:border-slate-700 px-4 md:px-6 py-4 flex justify-between items-center shadow-md">
           <div className="flex items-center gap-3">
             <button onClick={() => setIsSidebarOpen(true)} className="p-2 text-slate-400 md:hidden"><Menu size={20} /></button>
-            <h2 className="text-[10px] font-black text-slate-400 dark:text-slate-500 uppercase tracking-widest hidden sm:block">
+            <h2 className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-widest hidden sm:block">
               {navItems.find(i => i.id === activeTab)?.label}
             </h2>
           </div>
           <div className="flex items-center gap-3">
             <div className="text-right hidden sm:block">
-              <p className="text-[10px] font-black text-slate-800 dark:text-slate-200 leading-none">{state.profile.fullName.split(' ')[0]}</p>
-              <p className="text-[8px] text-slate-400 dark:text-slate-500 font-bold uppercase tracking-widest">Casa Ativa</p>
+              <p className="text-xs font-semibold text-slate-800 dark:text-slate-200 leading-none">{state.profile.fullName.split(' ')[0]}</p>
+              <p className="text-xs text-slate-500 dark:text-slate-400 font-medium uppercase tracking-widest">Casa Ativa</p>
             </div>
-            <button onClick={() => setActiveTab('settings')} className="w-8 h-8 bg-indigo-600 rounded-lg flex items-center justify-center text-white font-black text-xs border border-white dark:border-slate-800 shadow-sm overflow-hidden">
+            <button onClick={() => setActiveTab('settings')} className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center text-white font-semibold text-sm border-2 border-white dark:border-slate-700 shadow-lg hover:scale-110 transition-all duration-200 overflow-hidden">
               {state.profile.profileImage ? <img src={state.profile.profileImage} alt="P" className="w-full h-full object-cover" /> : state.profile.fullName.charAt(0)}
             </button>
           </div>
@@ -500,16 +546,16 @@ const App: React.FC = () => {
         <main className="flex-1 p-4 md:p-6 max-w-full w-full mb-20 md:mb-0">
           {activeTab === 'dashboard' && <Dashboard state={state} onAction={() => setActiveTab('routine')} />}
           {activeTab === 'routine' && <RoutineView tasks={state.tasks} onAdd={addTask} onUpdate={updateTask} onDelete={deleteTask} />}
-          {activeTab === 'finance' && <FinanceView transactions={state.finance} tasks={state.tasks} onAdd={addTransaction} onUpdate={updateTransaction} onDelete={deleteTransaction} />}
+          {activeTab === 'finance' && <FinanceView transactions={state.finance} tasks={state.tasks} creditCards={state.creditCards} onAdd={addTransaction} onUpdate={updateTransaction} onDelete={deleteTransaction} />}
           {activeTab === 'health' && <HealthView medications={state.medications} onAdd={addMedication} onUpdate={updateMedication} onTakeDose={takeMedicationDose} onDelete={deleteMedication} />}
           {activeTab === 'shopping' && <ShoppingView items={state.shoppingList} onUpdate={updateShopping} />}
           {activeTab === 'settings' && <SettingsView state={state} onUpdate={(ns) => updateProfile(ns.profile, ns.theme)} onLogout={() => supabase.auth.signOut()} />}
         </main>
       </div>
 
-      <nav className="md:hidden fixed bottom-4 left-4 right-4 z-[90] bg-white/95 dark:bg-slate-900/95 backdrop-blur-md border border-slate-200 dark:border-slate-800 shadow-xl rounded-2xl p-1.5 flex items-center justify-between">
+      <nav className="md:hidden fixed bottom-4 left-4 right-4 z-[90] bg-white/95 dark:from-slate-900/95 dark:to-slate-800/95 backdrop-blur-lg border border-slate-200 dark:border-slate-700 shadow-xl rounded-3xl p-2 flex items-center justify-between">
         {navItems.map((item) => (
-          <button key={item.id} onClick={() => setActiveTab(item.id as TabId)} className={`flex flex-col items-center justify-center w-10 h-10 rounded-xl transition-all ${activeTab === item.id ? 'text-indigo-600 bg-indigo-50 dark:bg-indigo-900/30' : 'text-slate-400'}`}>
+          <button key={item.id} onClick={() => setActiveTab(item.id as TabId)} className={`flex flex-col items-center justify-center w-12 h-12 rounded-2xl transition-all duration-200 hover:scale-110 ${activeTab === item.id ? 'text-white bg-gradient-to-br from-indigo-500 to-purple-600 shadow-lg' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'}`}>
             {item.icon}
           </button>
         ))}

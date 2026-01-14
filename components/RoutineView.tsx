@@ -19,7 +19,8 @@ import {
   LayoutGrid,
   CalendarDays,
   Trash2,
-  GripVertical
+  GripVertical,
+  Calendar as CalendarIcon
 } from 'lucide-react';
 
 interface RoutineViewProps {
@@ -135,29 +136,59 @@ const RoutineView: React.FC<RoutineViewProps> = ({ tasks, onAdd, onUpdate, onDel
     const firstDay = new Date(year, month, 1).getDay();
 
     return (
-      <div className="space-y-4 animate-in fade-in duration-500">
-        <div className="flex flex-col sm:flex-row justify-between items-center gap-4 bg-white dark:bg-zinc-900 p-4 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-sm">
-          <div className="flex gap-1 p-1 bg-zinc-100 dark:bg-zinc-800 rounded-xl">
-            {(['day', 'week', 'month'] as CalendarSubView[]).map(v => (
-              <button key={v} onClick={() => setCalView(v)} className={`px-4 py-1.5 rounded-lg text-xs font-semibold uppercase tracking-wider transition-all ${calView === v ? 'bg-white dark:bg-zinc-700 text-indigo-600 shadow-sm' : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'}`}>
-                {v === 'day' ? 'Dia' : v === 'week' ? 'Semana' : 'Mês'}
-              </button>
-            ))}
+      <div className="space-y-6 animate-in fade-in duration-500">
+        <div className="bg-white dark:bg-zinc-900 p-6 rounded-3xl border border-zinc-200 dark:border-zinc-800 shadow-sm">
+          <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
+            <div>
+              <h3 className="text-lg font-bold text-zinc-900 dark:text-zinc-100">Calendário</h3>
+              <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-1">Visualize suas tarefas por data</p>
+            </div>
+            <div className="flex gap-1 p-1 bg-zinc-100 dark:bg-zinc-800 rounded-2xl">
+              {(['day', 'week', 'month'] as CalendarSubView[]).map(v => (
+                <button
+                  key={v}
+                  onClick={() => setCalView(v)}
+                  className={`px-4 py-2 rounded-xl text-sm font-medium transition-all ${
+                    calView === v
+                      ? 'bg-white dark:bg-zinc-700 text-indigo-600 shadow-sm'
+                      : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'
+                  }`}
+                >
+                  {v === 'day' ? 'Dia' : v === 'week' ? 'Semana' : 'Mês'}
+                </button>
+              ))}
+            </div>
           </div>
-          <div className="flex items-center gap-4">
-            <button onClick={() => navigateDate('prev')} className="p-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-full text-zinc-500"><ChevronLeft size={18} /></button>
-            <span className="text-xs font-bold uppercase tracking-wider text-zinc-800 dark:text-zinc-200 min-w-[140px] text-center">
-              {currentDate.toLocaleDateString('pt-BR', calView === 'month' ? { month: 'long', year: 'numeric' } : { day: '2-digit', month: 'short' })}
+          <div className="flex items-center justify-center gap-4 mt-6">
+            <button
+              onClick={() => navigateDate('prev')}
+              className="p-3 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-xl text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 transition-all"
+            >
+              <ChevronLeft size={20} />
+            </button>
+            <span className="text-lg font-bold text-zinc-900 dark:text-zinc-100 min-w-[200px] text-center">
+              {currentDate.toLocaleDateString('pt-BR', calView === 'month' ? { month: 'long', year: 'numeric' } : { day: '2-digit', month: 'short', year: 'numeric' })}
             </span>
-            <button onClick={() => navigateDate('next')} className="p-2 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-full text-zinc-500"><ChevronRight size={18} /></button>
+            <button
+              onClick={() => navigateDate('next')}
+              className="p-3 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-xl text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300 transition-all"
+            >
+              <ChevronRight size={20} />
+            </button>
           </div>
         </div>
 
         <div className="bg-white dark:bg-zinc-900 rounded-3xl border border-zinc-200 dark:border-zinc-800 p-6 min-h-[400px] shadow-sm overflow-x-auto">
           {calView === 'month' && (
-            <div className="grid grid-cols-7 gap-2 min-w-[500px]">
-              {['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'].map(d => <div key={d} className="text-center text-[10px] font-bold text-zinc-400 uppercase py-2 tracking-wider">{d}</div>)}
-              {Array.from({ length: firstDay }).map((_, i) => <div key={`empty-${i}`} className="aspect-square"></div>)}
+            <div className="grid grid-cols-7 gap-3 min-w-[500px]">
+              {['Dom', 'Seg', 'Ter', 'Qua', 'Qui', 'Sex', 'Sáb'].map(d => (
+                <div key={d} className="text-center text-xs font-bold text-zinc-400 uppercase py-3 tracking-wider">
+                  {d}
+                </div>
+              ))}
+              {Array.from({ length: firstDay }).map((_, i) => (
+                <div key={`empty-${i}`} className="aspect-square"></div>
+              ))}
               {Array.from({ length: daysInMonth }).map((_, i) => {
                 const day = i + 1;
                 const dayTasks = tasks.filter(t => {
@@ -165,10 +196,18 @@ const RoutineView: React.FC<RoutineViewProps> = ({ tasks, onAdd, onUpdate, onDel
                   return d.getDate() === day && d.getMonth() === month && d.getFullYear() === year;
                 });
                 return (
-                  <div key={day} onClick={() => { const d = new Date(currentDate); d.setDate(day); setCurrentDate(d); setCalView('day'); }} className="aspect-square border border-zinc-100 dark:border-zinc-800 rounded-xl p-1 flex flex-col items-center gap-1 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors cursor-pointer group">
-                    <span className={`text-xs font-medium ${dayTasks.length > 0 ? 'text-indigo-600 font-bold' : 'text-zinc-500'}`}>{day}</span>
-                    <div className="flex flex-wrap gap-0.5 justify-center">
-                      {dayTasks.slice(0, 3).map(t => <div key={t.id} className="w-1.5 h-1.5 bg-indigo-500 rounded-full"></div>)}
+                  <div
+                    key={day}
+                    onClick={() => { const d = new Date(currentDate); d.setDate(day); setCurrentDate(d); setCalView('day'); }}
+                    className="aspect-square border border-zinc-100 dark:border-zinc-800 rounded-2xl p-2 flex flex-col items-center gap-1 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors cursor-pointer group"
+                  >
+                    <span className={`text-sm font-medium ${dayTasks.length > 0 ? 'text-indigo-600 font-bold' : 'text-zinc-500'}`}>
+                      {day}
+                    </span>
+                    <div className="flex flex-wrap gap-1 justify-center">
+                      {dayTasks.slice(0, 3).map(t => (
+                        <div key={t.id} className={`w-1.5 h-1.5 rounded-full ${t.priority === 'high' ? 'bg-red-500' : t.priority === 'medium' ? 'bg-yellow-500' : 'bg-green-500'}`}></div>
+                      ))}
                     </div>
                   </div>
                 );
@@ -177,32 +216,82 @@ const RoutineView: React.FC<RoutineViewProps> = ({ tasks, onAdd, onUpdate, onDel
           )}
           {calView === 'day' && (
             <div className="space-y-4 max-w-md mx-auto">
-              <h4 className="text-xs font-bold text-zinc-400 uppercase tracking-widest text-center border-b border-zinc-100 dark:border-zinc-800 pb-4">Agenda: {currentDate.toLocaleDateString()}</h4>
+              <h4 className="text-sm font-bold text-zinc-400 uppercase tracking-widest text-center border-b border-zinc-100 dark:border-zinc-800 pb-4">
+                Agenda: {currentDate.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })}
+              </h4>
               {tasks.filter(t => new Date(t.dueDate).toDateString() === currentDate.toDateString()).length === 0 ? (
-                <div className="text-center py-20 opacity-50 text-xs font-medium uppercase tracking-wider text-zinc-400">Nada planejado</div>
+                <div className="text-center py-20 opacity-50">
+                  <CalendarIcon size={48} className="mx-auto text-zinc-300 dark:text-zinc-600 mb-4" />
+                  <div className="text-sm font-medium uppercase tracking-wider text-zinc-400">Nada planejado</div>
+                  <p className="text-xs text-zinc-400 mt-2">Adicione tarefas para este dia</p>
+                </div>
               ) : (
-                tasks.filter(t => new Date(t.dueDate).toDateString() === currentDate.toDateString()).map(t => (
-                  <div key={t.id} onClick={() => setEditingTask(t)} className="flex items-center gap-4 p-4 bg-zinc-50 dark:bg-zinc-800/50 rounded-2xl cursor-pointer hover:border-indigo-500 border border-transparent transition-all">
-                    <div className="text-xs font-bold text-indigo-600">{new Date(t.dueDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</div>
-                    <div className="text-sm font-medium text-zinc-700 dark:text-zinc-200 flex-1 truncate">{t.title}</div>
-                  </div>
-                ))
+                <div className="space-y-3">
+                  {tasks.filter(t => new Date(t.dueDate).toDateString() === currentDate.toDateString())
+                    .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime())
+                    .map(t => (
+                      <div
+                        key={t.id}
+                        onClick={() => setEditingTask(t)}
+                        className="flex items-center gap-4 p-4 bg-zinc-50 dark:bg-zinc-800/50 rounded-2xl cursor-pointer hover:border-indigo-500 border border-transparent transition-all group"
+                      >
+                        <div className="text-sm font-bold text-indigo-600 bg-white dark:bg-zinc-900 px-3 py-1 rounded-xl border border-zinc-200 dark:border-zinc-700">
+                          {new Date(t.dueDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                        </div>
+                        <div className="flex-1">
+                          <div className="text-sm font-medium text-zinc-700 dark:text-zinc-200 group-hover:text-indigo-600 transition-colors">
+                            {t.title}
+                          </div>
+                          {t.responsible && (
+                            <div className="text-xs text-zinc-500 mt-1">👤 {t.responsible}</div>
+                          )}
+                        </div>
+                        <div className={`w-3 h-3 rounded-full ${t.priority === 'high' ? 'bg-red-500' : t.priority === 'medium' ? 'bg-yellow-500' : 'bg-green-500'}`}></div>
+                      </div>
+                    ))}
+                </div>
               )}
             </div>
           )}
           {calView === 'week' && (
-            <div className="flex gap-2 h-full overflow-x-auto no-scrollbar min-w-[800px]">
+            <div className="flex gap-3 h-full overflow-x-auto no-scrollbar min-w-[800px]">
               {Array.from({ length: 7 }).map((_, i) => {
                 const d = new Date(currentDate);
                 d.setDate(currentDate.getDate() - currentDate.getDay() + i);
                 const dayTasks = tasks.filter(t => new Date(t.dueDate).toDateString() === d.toDateString());
+                const isToday = d.toDateString() === new Date().toDateString();
                 return (
-                  <div key={i} className="flex-1 min-w-[120px] bg-zinc-50 dark:bg-zinc-800/20 rounded-2xl p-2 flex flex-col gap-2 border border-zinc-100 dark:border-zinc-800/50">
-                    <div className="text-center text-[10px] font-bold text-zinc-400 uppercase border-b border-zinc-200 dark:border-zinc-800 pb-1">{d.toLocaleDateString('pt-BR', { weekday: 'short' })} {d.getDate()}</div>
-                    <div className="space-y-1.5 flex-1 overflow-y-auto no-scrollbar">
-                      {dayTasks.map(t => (
-                        <div key={t.id} onClick={() => setEditingTask(t)} className="bg-white dark:bg-zinc-900 p-2.5 rounded-xl text-xs font-medium text-zinc-700 dark:text-zinc-300 shadow-sm border border-zinc-100 dark:border-zinc-800 hover:border-indigo-500 transition-all cursor-pointer">{t.title}</div>
-                      ))}
+                  <div key={i} className={`flex-1 min-w-[140px] rounded-2xl p-3 flex flex-col gap-3 border ${isToday ? 'bg-indigo-50 dark:bg-indigo-900/20 border-indigo-200 dark:border-indigo-800' : 'bg-zinc-50 dark:bg-zinc-800/20 border-zinc-100 dark:border-zinc-800/50'}`}>
+                    <div className={`text-center text-xs font-bold uppercase border-b pb-2 ${isToday ? 'border-indigo-200 dark:border-indigo-800 text-indigo-600' : 'border-zinc-200 dark:border-zinc-800 text-zinc-400'}`}>
+                      {d.toLocaleDateString('pt-BR', { weekday: 'short' })}
+                      <div className={`text-lg font-bold mt-1 ${isToday ? 'text-indigo-600' : 'text-zinc-600 dark:text-zinc-300'}`}>
+                        {d.getDate()}
+                      </div>
+                    </div>
+                    <div className="space-y-2 flex-1 overflow-y-auto no-scrollbar">
+                      {dayTasks.length === 0 ? (
+                        <div className="text-center py-8 opacity-50">
+                          <div className="text-xs text-zinc-400">Sem tarefas</div>
+                        </div>
+                      ) : (
+                        dayTasks.map(t => (
+                          <div
+                            key={t.id}
+                            onClick={() => setEditingTask(t)}
+                            className="bg-white dark:bg-zinc-900 p-3 rounded-xl text-xs font-medium text-zinc-700 dark:text-zinc-300 shadow-sm border border-zinc-100 dark:border-zinc-800 hover:border-indigo-500 transition-all cursor-pointer group"
+                          >
+                            <div className="font-semibold text-zinc-900 dark:text-zinc-100 group-hover:text-indigo-600 transition-colors">
+                              {t.title}
+                            </div>
+                            <div className="text-xs text-zinc-500 mt-1">
+                              {new Date(t.dueDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            </div>
+                            {t.responsible && (
+                              <div className="text-xs text-zinc-400 mt-1">👤 {t.responsible}</div>
+                            )}
+                          </div>
+                        ))
+                      )}
                     </div>
                   </div>
                 );
@@ -215,55 +304,158 @@ const RoutineView: React.FC<RoutineViewProps> = ({ tasks, onAdd, onUpdate, onDel
   };
 
   const renderChecklist = () => (
-    <div className="bg-white dark:bg-zinc-900 rounded-3xl border border-zinc-200 dark:border-zinc-800 shadow-sm overflow-hidden animate-in fade-in duration-500">
-      <div className="divide-y divide-zinc-100 dark:divide-zinc-800">
-        {tasks.sort((a, b) => new Date(b.dueDate).getTime() - new Date(a.dueDate).getTime()).map(task => (
-          <div key={task.id} className="px-6 py-4 flex items-center justify-between group hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-all">
-            <div className="flex items-center gap-4 flex-1">
-              <button
-                onClick={() => toggleTaskStatus(task)}
-                className={`w-6 h-6 rounded-full flex items-center justify-center transition-all shrink-0 border-2 ${task.status === 'completed' ? 'bg-emerald-500 border-emerald-500 text-white' : 'border-zinc-300 dark:border-zinc-600 text-transparent hover:border-indigo-400'}`}
-              >
-                <Check size={14} />
-              </button>
-              <div onClick={() => toggleTaskStatus(task)} className="cursor-pointer flex-1 py-1">
-                <p className={`text-sm font-medium transition-all ${task.status === 'completed' ? 'text-zinc-400 line-through' : 'text-zinc-800 dark:text-zinc-200'}`}>{task.title}</p>
-                <div className="flex items-center gap-3 mt-1 text-xs font-medium text-zinc-400 uppercase tracking-wide">
-                  <span className="flex items-center gap-1"><Clock size={12} /> {new Date(task.dueDate).toLocaleDateString()}</span>
-                  <span>•</span>
-                  <span>{task.responsible}</span>
+    <div className="space-y-6 animate-in fade-in duration-500">
+      <div className="bg-white dark:bg-zinc-900 p-6 rounded-3xl border border-zinc-200 dark:border-zinc-800 shadow-sm">
+        <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
+          <div>
+            <h3 className="text-lg font-bold text-zinc-900 dark:text-zinc-100">Todas as Tarefas</h3>
+            <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-1">Lista completa das suas atividades</p>
+          </div>
+          <div className="flex gap-2">
+            <button
+              onClick={() => setIsAdding(true)}
+              className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-medium transition-all flex items-center gap-2"
+            >
+              <Plus size={16} />
+              Nova Tarefa
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div className="bg-white dark:bg-zinc-900 rounded-3xl border border-zinc-200 dark:border-zinc-800 shadow-sm overflow-hidden">
+        <div className="divide-y divide-zinc-100 dark:divide-zinc-800">
+          {tasks.sort((a, b) => new Date(b.dueDate).getTime() - new Date(a.dueDate).getTime()).map(task => (
+            <div key={task.id} className="px-6 py-5 flex items-center justify-between group hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-all">
+              <div className="flex items-center gap-4 flex-1">
+                <button
+                  onClick={() => toggleTaskStatus(task)}
+                  className={`w-6 h-6 rounded-full flex items-center justify-center transition-all shrink-0 border-2 ${
+                    task.status === 'completed'
+                      ? 'bg-emerald-500 border-emerald-500 text-white'
+                      : 'border-zinc-300 dark:border-zinc-600 text-transparent hover:border-indigo-400'
+                  }`}
+                >
+                  <Check size={14} />
+                </button>
+                <div onClick={() => toggleTaskStatus(task)} className="cursor-pointer flex-1 py-1">
+                  <p className={`text-sm font-semibold transition-all mb-1 ${
+                    task.status === 'completed' ? 'text-zinc-400 line-through' : 'text-zinc-900 dark:text-zinc-100'
+                  }`}>
+                    {task.title}
+                  </p>
+                  <div className="flex items-center gap-4 text-xs font-medium text-zinc-500 dark:text-zinc-400">
+                    <div className="flex items-center gap-1">
+                      <Clock size={12} />
+                      <span>{new Date(task.dueDate).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}</span>
+                    </div>
+                    {task.responsible && (
+                      <>
+                        <span>•</span>
+                        <span>👤 {task.responsible}</span>
+                      </>
+                    )}
+                    {task.priority !== 'medium' && (
+                      <>
+                        <span>•</span>
+                        <span className={`px-2 py-0.5 rounded-full text-xs font-medium ${
+                          task.priority === 'high' ? 'bg-red-100 text-red-700 dark:bg-red-900/20 dark:text-red-400' :
+                          'bg-green-100 text-green-700 dark:bg-green-900/20 dark:text-green-400'
+                        }`}>
+                          {task.priority === 'high' ? 'Alta' : 'Baixa'}
+                        </span>
+                      </>
+                    )}
+                  </div>
                 </div>
               </div>
+              <div className="flex items-center gap-2">
+                <button
+                  onClick={() => setEditingTask(task)}
+                  className="p-2 text-zinc-400 hover:text-indigo-600 opacity-0 group-hover:opacity-100 transition-all rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800"
+                  title="Editar"
+                >
+                  <Edit2 size={16} />
+                </button>
+                <button
+                  onClick={() => { if (confirm('Excluir esta tarefa?')) onDelete(task.id); }}
+                  className="p-2 text-zinc-400 hover:text-rose-600 opacity-0 group-hover:opacity-100 transition-all rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800"
+                  title="Excluir"
+                >
+                  <Trash2 size={16} />
+                </button>
+              </div>
             </div>
-            <div className="flex items-center gap-2">
-              <button onClick={() => setEditingTask(task)} className="p-2 text-zinc-300 hover:text-indigo-600 opacity-0 group-hover:opacity-100 transition-all" title="Editar"><Edit2 size={16} /></button>
-              <button onClick={() => { if (confirm('Excluir esta tarefa?')) onDelete(task.id); }} className="p-2 text-zinc-300 hover:text-rose-600 opacity-0 group-hover:opacity-100 transition-all" title="Excluir"><Trash2 size={16} /></button>
+          ))}
+          {tasks.length === 0 && (
+            <div className="py-24 text-center">
+              <div className="text-zinc-400 dark:text-zinc-500 mb-2">
+                <CheckCircle2 size={48} className="mx-auto mb-4 opacity-50" />
+              </div>
+              <div className="text-lg font-semibold text-zinc-900 dark:text-zinc-100 mb-2">Tudo em ordem!</div>
+              <div className="text-sm text-zinc-500 dark:text-zinc-400">Sua casa está organizada e todas as tarefas estão concluídas</div>
             </div>
-          </div>
-        ))}
-        {tasks.length === 0 && <div className="py-24 text-center text-zinc-400 text-xs font-medium uppercase tracking-widest">Sua casa está em ordem</div>}
+          )}
+        </div>
       </div>
     </div>
   );
 
   return (
     <div className="space-y-6 pb-24 max-w-7xl mx-auto px-4">
-      {/* View Selector */}
-      <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
-        <div className="flex gap-1 p-1 bg-white dark:bg-slate-900 border border-slate-100 dark:border-slate-800 rounded-2xl shadow-sm">
-          <button onClick={() => setView('kanban')} className={`p-2.5 rounded-xl transition-all ${view === 'kanban' ? 'bg-indigo-50 dark:bg-indigo-900/40 text-indigo-600' : 'text-slate-400 hover:text-slate-600'}`} title="Kanban">
-            <Columns size={18} />
-          </button>
-          <button onClick={() => setView('list')} className={`p-2.5 rounded-xl transition-all ${view === 'list' ? 'bg-indigo-50 dark:bg-indigo-900/40 text-indigo-600' : 'text-slate-400 hover:text-slate-600'}`} title="Checklist">
-            <ListIcon size={18} />
-          </button>
-          <button onClick={() => setView('calendar')} className={`p-2.5 rounded-xl transition-all ${view === 'calendar' ? 'bg-indigo-50 dark:bg-indigo-900/40 text-indigo-600' : 'text-slate-400 hover:text-slate-600'}`} title="Calendário">
-            <CalIcon size={18} />
+      {/* Header Section */}
+      <div className="bg-white dark:bg-zinc-900 rounded-3xl border border-zinc-200 dark:border-zinc-800 shadow-sm p-6">
+        <div className="flex flex-col sm:flex-row justify-between items-center gap-6">
+          <div>
+            <h1 className="text-2xl font-bold text-zinc-900 dark:text-zinc-100 mb-2">Rotinas da Casa</h1>
+            <p className="text-sm text-zinc-500 dark:text-zinc-400">Gerencie suas tarefas e mantenha tudo organizado</p>
+          </div>
+          <button
+            onClick={() => { resetForm(); setIsAdding(true); }}
+            className="w-full sm:w-auto bg-indigo-600 text-white px-6 py-3 rounded-2xl font-semibold text-sm flex items-center justify-center gap-2 shadow-lg hover:bg-indigo-700 hover:scale-[1.02] active:scale-95 transition-all"
+          >
+            <Plus size={18} /> Nova Tarefa
           </button>
         </div>
-        <button onClick={() => { resetForm(); setIsAdding(true); }} className="w-full sm:w-auto bg-indigo-600 text-white px-6 py-3 rounded-2xl font-black text-[10px] uppercase tracking-[0.2em] flex items-center justify-center gap-2 shadow-xl hover:bg-indigo-700 hover:scale-[1.02] active:scale-95 transition-all">
-          <Plus size={16} /> Nova Tarefa
-        </button>
+      </div>
+
+      {/* View Selector */}
+      <div className="bg-white dark:bg-zinc-900 rounded-3xl border border-zinc-200 dark:border-zinc-800 shadow-sm p-4">
+        <div className="flex gap-1 p-1 bg-zinc-100 dark:bg-zinc-800 rounded-2xl w-fit">
+          <button
+            onClick={() => setView('kanban')}
+            className={`px-6 py-3 rounded-xl transition-all flex items-center gap-2 text-sm font-medium ${
+              view === 'kanban'
+                ? 'bg-white dark:bg-zinc-700 text-indigo-600 shadow-sm'
+                : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'
+            }`}
+          >
+            <Columns size={18} />
+            Kanban
+          </button>
+          <button
+            onClick={() => setView('list')}
+            className={`px-6 py-3 rounded-xl transition-all flex items-center gap-2 text-sm font-medium ${
+              view === 'list'
+                ? 'bg-white dark:bg-zinc-700 text-indigo-600 shadow-sm'
+                : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'
+            }`}
+          >
+            <ListIcon size={18} />
+            Lista
+          </button>
+          <button
+            onClick={() => setView('calendar')}
+            className={`px-6 py-3 rounded-xl transition-all flex items-center gap-2 text-sm font-medium ${
+              view === 'calendar'
+                ? 'bg-white dark:bg-zinc-700 text-indigo-600 shadow-sm'
+                : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'
+            }`}
+          >
+            <CalIcon size={18} />
+            Calendário
+          </button>
+        </div>
       </div>
 
       {/* Kanban com Drag & Drop */}
@@ -275,16 +467,18 @@ const RoutineView: React.FC<RoutineViewProps> = ({ tasks, onAdd, onUpdate, onDel
               onDragOver={onDragOver}
               onDragLeave={onDragLeave}
               onDrop={(e) => onDrop(e, stage.id)}
-              className="flex flex-col gap-4 bg-zinc-100/50 dark:bg-zinc-900/50 p-4 rounded-3xl min-h-[450px] transition-colors duration-200 border border-zinc-200/50 dark:border-zinc-800"
+              className="bg-white dark:bg-zinc-900 rounded-3xl border border-zinc-200 dark:border-zinc-800 shadow-sm p-6 min-h-[500px] transition-all duration-200"
             >
-              <div className="flex items-center justify-between px-2">
-                <div className="flex items-center gap-2">
-                  <div className={`w-2 h-2 rounded-full ${stage.color}`}></div>
-                  <h4 className="text-[10px] font-bold uppercase tracking-widest text-zinc-500">{stage.label}</h4>
+              <div className="flex items-center justify-between mb-6">
+                <div className="flex items-center gap-3">
+                  <div className={`w-3 h-3 rounded-full ${stage.color}`}></div>
+                  <h3 className="text-sm font-bold text-zinc-900 dark:text-zinc-100 uppercase tracking-wide">{stage.label}</h3>
                 </div>
-                <span className="text-[10px] font-bold text-zinc-400">{tasks.filter(t => t.status === stage.id).length}</span>
+                <span className="bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 px-3 py-1 rounded-full text-xs font-semibold">
+                  {tasks.filter(t => t.status === stage.id).length}
+                </span>
               </div>
-              <div className="space-y-3">
+              <div className="space-y-4">
                 {tasks.filter(t => t.status === stage.id).map(task => (
                   <div
                     key={task.id}
@@ -292,18 +486,39 @@ const RoutineView: React.FC<RoutineViewProps> = ({ tasks, onAdd, onUpdate, onDel
                     onDragStart={(e) => onDragStart(e, task.id)}
                     onDragEnd={onDragEnd}
                     onClick={() => setEditingTask(task)}
-                    className="bg-white dark:bg-zinc-800 p-4 rounded-2xl shadow-sm border border-zinc-200 dark:border-zinc-700 cursor-move hover:border-indigo-400 hover:shadow-md transition-all group relative active:scale-95"
+                    className="bg-white dark:bg-zinc-800 p-5 rounded-2xl shadow-sm border border-zinc-200 dark:border-zinc-700 cursor-move hover:border-indigo-300 hover:shadow-md transition-all group relative"
                   >
                     <div className="absolute top-4 right-4 text-zinc-300 group-hover:text-zinc-400 transition-colors">
-                      <GripVertical size={14} />
+                      <GripVertical size={16} />
                     </div>
-                    <h5 className={`font-semibold text-xs leading-snug pr-6 ${task.status === 'completed' ? 'text-zinc-400 line-through' : 'text-zinc-800 dark:text-zinc-100'}`}>{task.title}</h5>
-                    <div className="flex items-center justify-between mt-3 text-[9px] font-bold text-zinc-400 uppercase tracking-wider">
-                      <span className="opacity-80 truncate max-w-[80px]">{task.responsible}</span>
-                      <div className="flex items-center gap-1"><Clock size={10} /> {new Date(task.dueDate).toLocaleDateString([], { day: '2-digit', month: '2-digit' })}</div>
+                    <h4 className={`font-semibold text-sm leading-tight pr-8 mb-3 ${task.status === 'completed' ? 'text-zinc-400 line-through' : 'text-zinc-900 dark:text-zinc-100'}`}>
+                      {task.title}
+                    </h4>
+                    <div className="flex items-center justify-between text-xs">
+                      <div className="flex items-center gap-2 text-zinc-500 dark:text-zinc-400">
+                        <Clock size={12} />
+                        <span className="font-medium">{new Date(task.dueDate).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short' })}</span>
+                      </div>
+                      <div className="text-zinc-600 dark:text-zinc-400 font-medium">
+                        {task.responsible}
+                      </div>
                     </div>
+                    {task.priority !== 'medium' && (
+                      <div className={`mt-3 inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
+                        task.priority === 'high' ? 'bg-red-100 text-red-700 dark:bg-red-900/20 dark:text-red-400' :
+                        'bg-green-100 text-green-700 dark:bg-green-900/20 dark:text-green-400'
+                      }`}>
+                        {task.priority === 'high' ? 'Alta' : 'Baixa'} prioridade
+                      </div>
+                    )}
                   </div>
                 ))}
+                {tasks.filter(t => t.status === stage.id).length === 0 && (
+                  <div className="text-center py-12 text-zinc-400 dark:text-zinc-500">
+                    <div className="text-sm font-medium mb-2">Nenhuma tarefa</div>
+                    <div className="text-xs">Arraste tarefas aqui</div>
+                  </div>
+                )}
               </div>
             </div>
           ))}
