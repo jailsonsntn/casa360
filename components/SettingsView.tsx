@@ -67,6 +67,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({ state, onUpdate, onLogout }
   const [cardType, setCardType] = useState('');
   const [lastFourDigits, setLastFourDigits] = useState('');
   const [cardColor, setCardColor] = useState('#6366f1');
+  const [cardClosingDay, setCardClosingDay] = useState('1');
 
   const resetCardForm = () => {
     setCardName('');
@@ -74,6 +75,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({ state, onUpdate, onLogout }
     setCardType('');
     setLastFourDigits('');
     setCardColor('#6366f1');
+    setCardClosingDay('1');
     setEditingCard(null);
     setShowCardModal(false);
   };
@@ -90,11 +92,18 @@ const SettingsView: React.FC<SettingsViewProps> = ({ state, onUpdate, onLogout }
     setCardType(card.cardType || '');
     setLastFourDigits(card.lastFourDigits || '');
     setCardColor(card.color);
+    setCardClosingDay(card.closingDay.toString());
     setShowCardModal(true);
   };
 
   const handleSaveCard = () => {
     if (!cardName.trim() || !cardOwner.trim()) return;
+
+    const closingDayNum = parseInt(cardClosingDay) || 1;
+    if (closingDayNum < 1 || closingDayNum > 31) {
+      alert('Dia de fechamento deve estar entre 1 e 31');
+      return;
+    }
 
     const cardData: CreditCard = {
       id: editingCard?.id || `card-${Date.now()}`,
@@ -103,6 +112,7 @@ const SettingsView: React.FC<SettingsViewProps> = ({ state, onUpdate, onLogout }
       cardType: cardType || undefined,
       lastFourDigits: lastFourDigits || undefined,
       color: cardColor,
+      closingDay: closingDayNum,
       isActive: true,
       createdAt: editingCard?.createdAt || new Date().toISOString()
     };
@@ -345,37 +355,37 @@ const SettingsView: React.FC<SettingsViewProps> = ({ state, onUpdate, onLogout }
 
       {/* Modal para Adicionar/Editar Cartão */}
       {showCardModal && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[150] flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-zinc-900 w-full max-w-md rounded-3xl shadow-2xl border border-zinc-200 dark:border-zinc-800 flex flex-col max-h-[90vh] overflow-hidden">
-            <div className="px-6 py-5 border-b border-zinc-100 dark:border-zinc-800 flex justify-between items-center">
-              <h3 className="font-semibold text-base text-zinc-900 dark:text-zinc-100">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[150] flex items-center justify-center p-2">
+          <div className="bg-white dark:bg-zinc-900 w-full max-w-sm rounded-2xl shadow-2xl border border-zinc-200 dark:border-zinc-800 flex flex-col max-h-[95vh] overflow-hidden">
+            <div className="px-4 py-3 border-b border-zinc-100 dark:border-zinc-800 flex justify-between items-center">
+              <h3 className="font-semibold text-sm text-zinc-900 dark:text-zinc-100">
                 {editingCard ? 'Editar' : 'Novo'} Cartão
               </h3>
-              <button onClick={resetCardForm} className="p-2 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 transition-colors rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800">
-                <X size={20} />
+              <button onClick={resetCardForm} className="p-1 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-300 transition-colors rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800">
+                <X size={18} />
               </button>
             </div>
 
-            <form onSubmit={(e) => { e.preventDefault(); handleSaveCard(); }} className="flex-1 overflow-y-auto p-6 space-y-6">
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Nome do Cartão</label>
+            <form onSubmit={(e) => { e.preventDefault(); handleSaveCard(); }} className="flex-1 overflow-y-auto p-4 space-y-3">
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-zinc-700 dark:text-zinc-300">Nome do Cartão</label>
                 <input
                   type="text"
                   value={cardName}
                   onChange={e => setCardName(e.target.value)}
-                  className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl px-4 py-3 outline-none font-medium text-sm text-zinc-900 dark:text-zinc-100 focus:border-indigo-500 transition-colors"
-                  placeholder="Ex: Nubank, C6 Bank, Mercado Pago"
+                  className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 outline-none font-medium text-xs text-zinc-900 dark:text-zinc-100 focus:border-indigo-500 transition-colors"
+                  placeholder="Ex: Nubank, C6 Bank"
                   required
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Proprietário</label>
+              <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-zinc-700 dark:text-zinc-300">Proprietário</label>
                   <select
                     value={cardOwner}
                     onChange={e => setCardOwner(e.target.value)}
-                    className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl px-4 py-3 outline-none font-medium text-sm text-zinc-900 dark:text-zinc-100 focus:border-indigo-500 transition-colors"
+                    className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 outline-none font-medium text-xs text-zinc-900 dark:text-zinc-100 focus:border-indigo-500 transition-colors"
                     required
                   >
                     <option value="">Selecione</option>
@@ -383,43 +393,64 @@ const SettingsView: React.FC<SettingsViewProps> = ({ state, onUpdate, onLogout }
                     <option value="Jailson">Jailson</option>
                   </select>
                 </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Tipo</label>
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-zinc-700 dark:text-zinc-300">Tipo</label>
                   <select
                     value={cardType}
                     onChange={e => setCardType(e.target.value)}
-                    className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl px-4 py-3 outline-none font-medium text-sm text-zinc-900 dark:text-zinc-100 focus:border-indigo-500 transition-colors"
+                    className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 outline-none font-medium text-xs text-zinc-900 dark:text-zinc-100 focus:border-indigo-500 transition-colors"
                   >
                     <option value="">Selecione</option>
                     <option value="Visa">Visa</option>
                     <option value="Mastercard">Mastercard</option>
                     <option value="Elo">Elo</option>
-                    <option value="American Express">American Express</option>
+                    <option value="American Express">Amex</option>
                   </select>
                 </div>
               </div>
 
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Últimos 4 dígitos</label>
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-zinc-700 dark:text-zinc-300">Últimos 4 dígitos</label>
                 <input
                   type="text"
                   value={lastFourDigits}
                   onChange={e => setLastFourDigits(e.target.value.replace(/\D/g, '').slice(0, 4))}
-                  className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl px-4 py-3 outline-none font-medium text-sm text-zinc-900 dark:text-zinc-100 focus:border-indigo-500 transition-colors"
+                  className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 outline-none font-medium text-xs text-zinc-900 dark:text-zinc-100 focus:border-indigo-500 transition-colors"
                   placeholder="1234"
                   maxLength={4}
                 />
               </div>
 
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Cor do Cartão</label>
-                <div className="flex gap-2 flex-wrap">
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-zinc-700 dark:text-zinc-300">Dia de Fechamento</label>
+                <div className="flex gap-2">
+                  <input
+                    type="number"
+                    value={cardClosingDay}
+                    onChange={e => {
+                      const val = parseInt(e.target.value) || 1;
+                      if (val >= 1 && val <= 31) setCardClosingDay(val.toString());
+                    }}
+                    className="flex-1 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 outline-none font-medium text-xs text-zinc-900 dark:text-zinc-100 focus:border-indigo-500 transition-colors"
+                    placeholder="1"
+                    min="1"
+                    max="31"
+                  />
+                  <div className="text-xs text-zinc-500 dark:text-zinc-400 flex items-center px-2 bg-zinc-50 dark:bg-zinc-800 rounded-lg border border-zinc-200 dark:border-zinc-700">
+                    <span>mês</span>
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-zinc-700 dark:text-zinc-300">Cor</label>
+                <div className="flex gap-1.5 flex-wrap">
                   {['#6366f1', '#ec4899', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#06b6d4', '#84cc16'].map(color => (
                     <button
                       key={color}
                       type="button"
                       onClick={() => setCardColor(color)}
-                      className={`w-8 h-8 rounded-full border-2 transition-all ${cardColor === color ? 'border-zinc-900 dark:border-zinc-100 scale-110' : 'border-zinc-300 dark:border-zinc-600'}`}
+                      className={`w-6 h-6 rounded-full border-2 transition-all ${cardColor === color ? 'border-zinc-900 dark:border-zinc-100 scale-110' : 'border-zinc-300 dark:border-zinc-600'}`}
                       style={{ backgroundColor: color }}
                     />
                   ))}
@@ -427,12 +458,12 @@ const SettingsView: React.FC<SettingsViewProps> = ({ state, onUpdate, onLogout }
               </div>
             </form>
 
-            <div className="px-6 py-5 bg-white dark:bg-zinc-900 border-t border-zinc-100 dark:border-zinc-800">
+            <div className="px-4 py-3 bg-white dark:bg-zinc-900 border-t border-zinc-100 dark:border-zinc-800">
               <button
                 onClick={handleSaveCard}
-                className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-3 rounded-xl font-semibold text-sm shadow-sm flex items-center justify-center gap-2 transition-all active:scale-95"
+                className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-2 rounded-lg font-semibold text-xs shadow-sm flex items-center justify-center gap-1 transition-all active:scale-95"
               >
-                <Save size={18} /> Salvar Cartão
+                <Save size={16} /> Salvar
               </button>
             </div>
           </div>

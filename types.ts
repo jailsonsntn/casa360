@@ -74,10 +74,12 @@ export interface Medication {
   person: string;
   dosage: string;
   frequency: string;
-  stock: number;
+  stockQuantity: number;
   minStock: number;
   lastTaken?: string;
   isActive: boolean;
+  firstDoseTime?: string; // HH:mm para primeira dose
+  firstDoseDate?: string; // Data YYYY-MM-DD
   alarmConfig?: {
     enabled: boolean;
     times?: string[];
@@ -99,6 +101,10 @@ export interface Transaction {
   linkedEventId?: string;
   createdAt: string;
   isForecast?: boolean;
+  isInstallment?: boolean; // É parcelado?
+  installmentCount?: number; // Quantas parcelas
+  installmentNumber?: number; // Qual parcela (1, 2, 3...)
+  originalTransactionId?: string; // ID da transação original se for parcela
 }
 
 export interface ShoppingItem {
@@ -129,6 +135,7 @@ export interface CreditCard {
   lastFourDigits?: string;
   color: string;
   isActive: boolean;
+  closingDay: number; // Dia do mês (1-31)
   createdAt: string;
 }
 

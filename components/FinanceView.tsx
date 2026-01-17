@@ -53,6 +53,9 @@ const FinanceView: React.FC<FinanceViewProps> = ({ transactions, tasks, creditCa
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>('pix');
   const [classification, setClassification] = useState<TransactionClassification>('fixed');
   const [selectedCreditCardId, setSelectedCreditCardId] = useState<string>('');
+  const [isInstallment, setIsInstallment] = useState(false);
+  const [installmentCount, setInstallmentCount] = useState(1);
+  const [showInstallmentModal, setShowInstallmentModal] = useState(false);
 
   const monthNames = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
 
@@ -104,26 +107,144 @@ const FinanceView: React.FC<FinanceViewProps> = ({ transactions, tasks, creditCa
     setValue(t.value.toString()); setDate(t.date);
     setPaymentMethod(t.paymentMethod); setClassification(t.classification);
     setSelectedCreditCardId(t.creditCardId || '');
+    setIsInstallment(t.isInstallment || false);
+    setInstallmentCount(t.installmentCount || 1);
     setIsAdding(true);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    const data = {
-      type, category, value: parseFloat(value), date,
-      recurring: classification === 'recurring' || classification === 'fixed',
-      notes: '', paymentMethod, classification,
-      creditCardId: paymentMethod === 'credit_card' ? selectedCreditCardId : undefined
-    };
-    if (editingItem && !editingItem.isForecast) onUpdate(editingItem.id, data);
-    else onAdd(data);
-    resetForm();
+    console.log("handleSubmit chamado - method:", paymentMethod, "installment:", isInstallment, "count:", installmentCount);
+    
+    try {
+      // Validar campos obrigatórios
+      if (!category.trim() || !value) {
+        console.error("Validação falhou: categoria ou valor vazios");
+        alert('Preencha categoria e valor');
+        return;
+      }
+
+      const numValue = parseFloat(value);
+      if (isNaN(numValue) || numValue <= 0) {
+        console.error("Validação falhou: valor inválido", numValue);
+        alert('Valor deve ser maior que 0');
+        return;
+      }
+      
+      console.log("Validação passada. Type:", type, "Category:", category, "Value:", numValue, "Date:", date);
+      
+      // Se for crédito, validar cartão (parcelamento já foi escolhido no formulário)
+      if (paymentMethod === 'credit_card' && !selectedCreditCardId) {
+        console.error("Validação falhou: sem cartão selecionado");
+        alert('Selecione um cartão de crédito');
+        return;
+      }
+
+      // Função auxiliar para criar transação base
+      const createTransaction = (installNum?: number, originalId?: string) => {
+        const transactionValue = isInstallment ? numValue / installmentCount : numValue;
+        // Para parcelamentos, NUNCA é recorrente (recurring: false)
+        // Para outros, segue a classificação
+        const isRecurring = (isInstallment && installmentCount > 1) ? false : (classification === 'recurring' || classification === 'fixed');
+        const tx = {
+          type, category, value: transactionValue, date,
+          recurring: isRecurring,
+          notes: '', paymentMethod, classification,
+          creditCardId: paymentMethod === 'credit_card' ? selectedCreditCardId : undefined,
+          isInstallment: isInstallment && installmentCount > 1,
+          installmentCount: isInstallment && installmentCount > 1 ? installmentCount : undefined,
+          installmentNumber: installNum,
+          originalTransactionId: originalId
+        };
+        console.log("Transação criada:", tx);
+        return tx;
+      };
+
+      if (isInstallment && installmentCount > 1 && paymentMethod === 'credit_card') {
+        console.log("Processando parcelamento com", installmentCount, "parcelas");
+        // Criar múltiplas transações (uma por parcela)
+        const card = creditCards.find(c => c.id === selectedCreditCardId);
+        if (!card) {
+          console.error("Cartão não encontrado:", selectedCreditCardId);
+          alert('Selecione um cartão válido');
+          return;
+        }
+
+        const purchaseDate = new Date(date);
+        const closingDay = card.closingDay;
+        const purchaseDay = purchaseDate.getDate();
+
+        console.log("Data de compra:", date, "Dia:", purchaseDay, "Fechamento:", closingDay);
+
+        // Determinar em qual mês entra a primeira parcela
+        let firstInstallmentMonth = purchaseDate.getMonth();
+        let firstInstallmentYear = purchaseDate.getFullYear();
+        
+        if (purchaseDay > closingDay) {
+          // Compra foi depois do fechamento, vai para próximo mês
+          firstInstallmentMonth += 1;
+          if (firstInstallmentMonth > 11) {
+            firstInstallmentMonth = 0;
+            firstInstallmentYear += 1;
+          }
+        }
+
+        console.log("Primeira parcela em:", firstInstallmentYear, "-", firstInstallmentMonth + 1);
+
+        // Criar uma transação para cada parcela
+        const firstInstallmentDate = new Date(firstInstallmentYear, firstInstallmentMonth, 1).toISOString().split('T')[0];
+        const firstData = { ...createTransaction(1, undefined), date: firstInstallmentDate };
+        console.log("Adicionando primeira parcela:", firstData);
+        if (editingItem && !editingItem.isForecast) {
+          onUpdate(editingItem.id, firstData);
+        } else {
+          onAdd(firstData);
+        }
+
+        // Adicionar as próximas parcelas
+        for (let i = 2; i <= installmentCount; i++) {
+          let installMonth = firstInstallmentMonth + (i - 1);
+          let installYear = firstInstallmentYear;
+          
+          if (installMonth > 11) {
+            installYear += Math.floor(installMonth / 12);
+            installMonth = installMonth % 12;
+          }
+          
+          const installmentDate = new Date(installYear, installMonth, 1).toISOString().split('T')[0];
+          const installmentData = {
+            ...createTransaction(i),
+            date: installmentDate
+          };
+          console.log("Adicionando parcela", i, ":", installmentData);
+          onAdd(installmentData);
+        }
+      } else {
+        // Transação única (à vista ou sem crédito)
+        console.log("Adicionando transação única (não parcelada)");
+        const data = createTransaction(undefined, undefined);
+        if (editingItem && !editingItem.isForecast) {
+          console.log("Atualizando transação:", editingItem.id);
+          onUpdate(editingItem.id, data);
+        } else {
+          console.log("Inserindo nova transação:", data);
+          onAdd(data);
+        }
+      }
+
+      console.log("Transação(ões) processada(s) com sucesso. Resetando formulário.");
+      resetForm();
+    } catch (err) {
+      console.error("Erro ao salvar transação:", err);
+      alert("Erro ao salvar transação. Verifique o console para mais detalhes.");
+    }
   };
 
   const resetForm = () => {
     setIsAdding(false); setEditingItem(null); setCategory(''); setValue('');
     setDate(new Date(selectedYear, selectedMonth, new Date().getDate()).toISOString().split('T')[0]);
     setPaymentMethod('pix'); setClassification('fixed'); setSelectedCreditCardId('');
+    setIsInstallment(false); setInstallmentCount(1); setShowInstallmentModal(false);
   };
 
   const confirmDelete = () => {
@@ -307,92 +428,92 @@ const FinanceView: React.FC<FinanceViewProps> = ({ transactions, tasks, creditCa
       )}
 
       {isAdding && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[150] flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-zinc-900 w-full max-w-md rounded-3xl shadow-2xl border border-zinc-200 dark:border-zinc-800 flex flex-col max-h-[90vh] overflow-hidden">
-            <div className="px-6 py-5 border-b border-zinc-100 dark:border-zinc-800 flex justify-between items-center">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[150] flex items-center justify-center p-2">
+          <div className="bg-white dark:bg-zinc-900 w-full max-w-sm rounded-2xl shadow-2xl border border-zinc-200 dark:border-zinc-800 flex flex-col max-h-[95vh] overflow-hidden">
+            <div className="px-4 py-3 border-b border-zinc-100 dark:border-zinc-800 flex justify-between items-center">
               <div>
-                <h3 className="font-bold text-zinc-900 dark:text-zinc-100">{editingItem ? 'Editar' : 'Novo'} Lançamento</h3>
-                <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-1">Adicione uma transação financeira</p>
+                <h3 className="font-bold text-sm text-zinc-900 dark:text-zinc-100">{editingItem ? 'Editar' : 'Novo'} Lançamento</h3>
+                <p className="text-xs text-zinc-500 dark:text-zinc-400 mt-0.5">Transação financeira</p>
               </div>
-              <button onClick={resetForm} className="p-2 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 transition-colors rounded-xl hover:bg-zinc-100 dark:hover:bg-zinc-800">
-                <X size={20} />
+              <button onClick={resetForm} className="p-1 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 transition-colors rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800">
+                <X size={18} />
               </button>
             </div>
 
-            <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-6 space-y-6 bg-white dark:bg-zinc-900 custom-scrollbar">
-              <div className="p-1 bg-zinc-100 dark:bg-zinc-800 rounded-2xl flex">
+            <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-4 space-y-3 bg-white dark:bg-zinc-900 custom-scrollbar">
+              <div className="p-0.5 bg-zinc-100 dark:bg-zinc-800 rounded-lg flex gap-0.5">
                 <button
                   type="button"
                   onClick={() => setType('expense')}
-                  className={`flex-1 py-3 text-sm font-medium rounded-xl transition-all flex items-center justify-center gap-2 ${
+                  className={`flex-1 py-2 text-xs font-medium rounded-md transition-all flex items-center justify-center gap-1 ${
                     type === 'expense'
                       ? 'bg-white dark:bg-zinc-700 text-rose-600 shadow-sm'
                       : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'
                   }`}
                 >
-                  <ArrowDownLeft size={16} />
+                  <ArrowDownLeft size={14} />
                   Saída
                 </button>
                 <button
                   type="button"
                   onClick={() => setType('income')}
-                  className={`flex-1 py-3 text-sm font-medium rounded-xl transition-all flex items-center justify-center gap-2 ${
+                  className={`flex-1 py-2 text-xs font-medium rounded-md transition-all flex items-center justify-center gap-1 ${
                     type === 'income'
                       ? 'bg-white dark:bg-zinc-700 text-emerald-600 shadow-sm'
                       : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'
                   }`}
                 >
-                  <ArrowUpRight size={16} />
+                  <ArrowUpRight size={14} />
                   Entrada
                 </button>
               </div>
 
-              <div className="space-y-2">
-                <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Descrição</label>
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-zinc-700 dark:text-zinc-300">Descrição</label>
                 <input
                   type="text"
                   value={category}
                   onChange={e => setCategory(e.target.value)}
-                  className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl px-4 py-3 outline-none font-medium text-sm text-zinc-900 dark:text-zinc-100 focus:border-indigo-500 transition-colors"
-                  placeholder="Ex: Mercado, Salário, Conta de luz..."
+                  className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 outline-none font-medium text-xs text-zinc-900 dark:text-zinc-100 focus:border-indigo-500 transition-colors"
+                  placeholder="Ex: Mercado, Salário..."
                   required
                 />
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Valor</label>
+              <div className="grid grid-cols-2 gap-2">
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-zinc-700 dark:text-zinc-300">Valor</label>
                   <input
                     type="number"
                     step="0.01"
                     value={value}
                     onChange={e => setValue(e.target.value)}
-                    className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl px-4 py-3 outline-none font-medium text-sm text-zinc-900 dark:text-zinc-100 focus:border-indigo-500 transition-colors"
+                    className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 outline-none font-medium text-xs text-zinc-900 dark:text-zinc-100 focus:border-indigo-500 transition-colors"
                     placeholder="0,00"
                     required
                   />
                 </div>
-                <div className="space-y-2">
-                  <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Data</label>
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-zinc-700 dark:text-zinc-300">Data</label>
                   <input
                     type="date"
                     value={date}
                     onChange={e => setDate(e.target.value)}
-                    className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl px-4 py-3 outline-none font-medium text-sm text-zinc-900 dark:text-zinc-100 focus:border-indigo-500 transition-colors"
+                    className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 outline-none font-medium text-xs text-zinc-900 dark:text-zinc-100 focus:border-indigo-500 transition-colors"
                     required
                   />
                 </div>
               </div>
 
-              <div className="space-y-3">
-                <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Forma de Pagamento</label>
-                <div className="grid grid-cols-3 gap-2">
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-zinc-700 dark:text-zinc-300">Forma de Pagamento</label>
+                <div className="grid grid-cols-3 gap-1">
                   {PAYMENT_METHODS.map(m => (
                     <button
                       key={m.id}
                       type="button"
                       onClick={() => { setPaymentMethod(m.id); setSelectedCreditCardId(''); }}
-                      className={`py-3 rounded-xl text-sm font-medium border transition-all ${
+                      className={`py-2 rounded-lg text-xs font-medium border transition-all ${
                         paymentMethod === m.id
                           ? 'bg-indigo-600 border-indigo-600 text-white shadow-sm'
                           : 'bg-zinc-50 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 text-zinc-500 dark:text-zinc-400 hover:border-indigo-400'
@@ -405,38 +526,85 @@ const FinanceView: React.FC<FinanceViewProps> = ({ transactions, tasks, creditCa
               </div>
 
               {paymentMethod === 'credit_card' && (
-                <div className="space-y-3">
-                  <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Cartão de Crédito</label>
-                  <select
-                    value={selectedCreditCardId}
-                    onChange={e => setSelectedCreditCardId(e.target.value)}
-                    className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl px-4 py-3 outline-none font-medium text-sm text-zinc-900 dark:text-zinc-100 focus:border-indigo-500 transition-colors"
-                    required={paymentMethod === 'credit_card'}
-                  >
-                    <option value="">Selecione um cartão</option>
-                    {creditCards.filter(card => card.isActive).map(card => (
-                      <option key={card.id} value={card.id}>
-                        {card.name} - {card.owner} (****{card.lastFourDigits})
-                      </option>
-                    ))}
-                  </select>
-                  {creditCards.filter(card => card.isActive).length === 0 && (
-                    <p className="text-xs text-amber-600 dark:text-amber-400">
-                      Nenhum cartão cadastrado. Adicione cartões nas configurações.
-                    </p>
+                <>
+                  <div className="space-y-1">
+                    <label className="text-xs font-medium text-zinc-700 dark:text-zinc-300">Cartão de Crédito</label>
+                    <select
+                      value={selectedCreditCardId}
+                      onChange={e => setSelectedCreditCardId(e.target.value)}
+                      className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 outline-none font-medium text-xs text-zinc-900 dark:text-zinc-100 focus:border-indigo-500 transition-colors"
+                      required={paymentMethod === 'credit_card'}
+                    >
+                      <option value="">Selecione um cartão</option>
+                      {creditCards.filter(card => card.isActive).map(card => (
+                        <option key={card.id} value={card.id}>
+                          {card.name} - {card.owner} (****{card.lastFourDigits})
+                        </option>
+                      ))}
+                    </select>
+                    {creditCards.filter(card => card.isActive).length === 0 && (
+                      <p className="text-xs text-amber-600 dark:text-amber-400">
+                        Nenhum cartão cadastrado
+                      </p>
+                    )}
+                  </div>
+
+                  {selectedCreditCardId && (
+                    <div className="space-y-1">
+                      <label className="text-xs font-medium text-zinc-700 dark:text-zinc-300">Forma de Pagamento</label>
+                      <div className="grid grid-cols-2 gap-2">
+                        <button
+                          type="button"
+                          onClick={() => { setIsInstallment(false); setInstallmentCount(1); }}
+                          className={`py-2.5 rounded-lg text-xs font-medium border transition-all ${
+                            !isInstallment
+                              ? 'bg-indigo-600 border-indigo-600 text-white shadow-sm'
+                              : 'bg-zinc-50 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 text-zinc-500 dark:text-zinc-400 hover:border-indigo-400'
+                          }`}
+                        >
+                          À Vista
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setIsInstallment(true)}
+                          className={`py-2.5 rounded-lg text-xs font-medium border transition-all ${
+                            isInstallment
+                              ? 'bg-indigo-600 border-indigo-600 text-white shadow-sm'
+                              : 'bg-zinc-50 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 text-zinc-500 dark:text-zinc-400 hover:border-indigo-400'
+                          }`}
+                        >
+                          Parcelado
+                        </button>
+                      </div>
+
+                      {isInstallment && (
+                        <div className="space-y-1 pt-1">
+                          <label className="text-xs font-medium text-zinc-700 dark:text-zinc-300">Número de Parcelas</label>
+                          <select
+                            value={installmentCount}
+                            onChange={e => setInstallmentCount(parseInt(e.target.value))}
+                            className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg px-3 py-2 outline-none font-medium text-xs text-zinc-900 dark:text-zinc-100 focus:border-indigo-500 transition-colors"
+                          >
+                            {[2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12].map(n => (
+                              <option key={n} value={n}>{n}x</option>
+                            ))}
+                          </select>
+                        </div>
+                      )}
+                    </div>
                   )}
-                </div>
+                </>
               )}
 
-              <div className="space-y-3">
-                <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300">Classificação</label>
-                <div className="grid grid-cols-3 gap-2">
+              <div className="space-y-1">
+                <label className="text-xs font-medium text-zinc-700 dark:text-zinc-300">Classificação</label>
+                <div className="grid grid-cols-3 gap-1">
                   {CLASSIFICATIONS.map(c => (
                     <button
                       key={c.id}
                       type="button"
                       onClick={() => setClassification(c.id)}
-                      className={`py-3 rounded-xl text-sm font-medium border transition-all ${
+                      className={`py-2 rounded-lg text-xs font-medium border transition-all ${
                         classification === c.id
                           ? 'bg-indigo-600 border-indigo-600 text-white shadow-sm'
                           : 'bg-zinc-50 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 text-zinc-500 dark:text-zinc-400 hover:border-indigo-400'
@@ -449,19 +617,20 @@ const FinanceView: React.FC<FinanceViewProps> = ({ transactions, tasks, creditCa
               </div>
             </form>
 
-            <div className="px-6 py-5 bg-white dark:bg-zinc-900 border-t border-zinc-100 dark:border-zinc-800">
+            <div className="px-4 py-3 bg-white dark:bg-zinc-900 border-t border-zinc-100 dark:border-zinc-800">
               <button
                 onClick={handleSubmit}
                 type="button"
-                className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-4 rounded-xl font-bold text-sm shadow-sm flex items-center justify-center gap-2 transition-all active:scale-95"
+                className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-2.5 rounded-lg font-bold text-xs shadow-sm flex items-center justify-center gap-1 transition-all active:scale-95"
               >
-                <Check size={18} />
-                {editingItem ? 'Salvar Alterações' : 'Confirmar Lançamento'}
+                <Check size={16} />
+                {editingItem ? 'Salvar' : 'Confirmar'}
               </button>
             </div>
           </div>
         </div>
       )}
+
     </div>
   );
 };

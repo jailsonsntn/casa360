@@ -158,6 +158,11 @@ const App: React.FC = () => {
         ...f,
         paymentMethod: f.payment_method || f.paymentMethod,
         linkedEventId: f.linked_event_id || f.linkedEventId,
+        creditCardId: f.credit_card_id || f.creditCardId,
+        isInstallment: f.is_installment || f.isInstallment || false,
+        installmentCount: f.installment_count || f.installmentCount,
+        installmentNumber: f.installment_number || f.installmentNumber,
+        originalTransactionId: f.original_transaction_id || f.originalTransactionId,
         createdAt: f.created_at || f.createdAt
       }));
 
@@ -166,6 +171,8 @@ const App: React.FC = () => {
         minStock: m.min_stock !== undefined ? m.min_stock : m.minStock,
         lastTaken: m.last_taken || m.lastTaken,
         isActive: m.is_active !== undefined ? m.is_active : m.isActive,
+        firstDoseTime: m.first_dose_time || m.firstDoseTime,
+        firstDoseDate: m.first_dose_date || m.firstDoseDate,
         alarmConfig: m.alarm_config || { enabled: false }
       }));
 
@@ -181,6 +188,7 @@ const App: React.FC = () => {
         cardType: c.card_type || c.cardType,
         lastFourDigits: c.last_four_digits || c.lastFourDigits,
         isActive: c.is_active !== undefined ? c.is_active : c.isActive,
+        closingDay: c.closing_day || c.closingDay || 1,
         createdAt: c.created_at || c.createdAt
       }));
 
@@ -348,8 +356,10 @@ const App: React.FC = () => {
       person: med.person,
       dosage: med.dosage,
       frequency: med.frequency,
-      stock: med.stock,
-      min_stock: med.minStock,
+      stock_quantity: med.stockQuantity || 0,
+      min_stock: med.minStock || 5,
+      first_dose_date: med.firstDoseDate || null,
+      first_dose_time: med.firstDoseTime || null,
       is_active: true
     }]).select().single();
 
@@ -361,7 +371,20 @@ const App: React.FC = () => {
     if (data) {
       setState(p => ({
         ...p,
-        medications: [...p.medications, { ...data, minStock: data.min_stock, lastTaken: data.last_taken, isActive: data.is_active, alarmConfig: med.alarmConfig || { enabled: false } }]
+        medications: [...p.medications, { 
+          id: data.id,
+          name: data.name,
+          person: data.person,
+          dosage: data.dosage,
+          frequency: data.frequency,
+          stockQuantity: data.stock_quantity,
+          minStock: data.min_stock,
+          firstDoseDate: data.first_dose_date,
+          firstDoseTime: data.first_dose_time,
+          lastTaken: data.last_taken,
+          isActive: data.is_active,
+          alarmConfig: med.alarmConfig || { enabled: false }
+        }]
       }));
     }
   };
@@ -374,8 +397,10 @@ const App: React.FC = () => {
     if (updates.dosage !== undefined) dbUpdates.dosage = updates.dosage;
     if (updates.frequency !== undefined) dbUpdates.frequency = updates.frequency;
     if (updates.isActive !== undefined) dbUpdates.is_active = updates.isActive;
-    if (updates.stock !== undefined) dbUpdates.stock = updates.stock;
+    if (updates.stockQuantity !== undefined) dbUpdates.stock_quantity = updates.stockQuantity;
     if (updates.minStock !== undefined) dbUpdates.min_stock = updates.minStock;
+    if (updates.firstDoseDate !== undefined) dbUpdates.first_dose_date = updates.firstDoseDate;
+    if (updates.firstDoseTime !== undefined) dbUpdates.first_dose_time = updates.firstDoseTime;
 
     const { error } = await supabase.from('medications').update(dbUpdates).eq('id', id);
     if (error) {
@@ -388,11 +413,11 @@ const App: React.FC = () => {
   const takeMedicationDose = async (id: string) => {
     if (!state.auth.userId) return;
     const med = state.medications.find(m => m.id === id);
-    if (!med || med.stock <= 0) return;
-    const newStock = med.stock - 1;
+    if (!med || med.stockQuantity <= 0) return;
+    const newStock = med.stockQuantity - 1;
     const now = new Date().toISOString();
-    const { error } = await supabase.from('medications').update({ stock: newStock, last_taken: now }).eq('id', id);
-    if (!error) setState(p => ({ ...p, medications: p.medications.map(m => m.id === id ? { ...m, stock: newStock, lastTaken: now } : m) }));
+    const { error } = await supabase.from('medications').update({ stock_quantity: newStock, last_taken: now }).eq('id', id);
+    if (!error) setState(p => ({ ...p, medications: p.medications.map(m => m.id === id ? { ...m, stockQuantity: newStock, lastTaken: now } : m) }));
   };
 
   const deleteMedication = async (id: string) => {
@@ -402,21 +427,91 @@ const App: React.FC = () => {
   };
 
   const addTransaction = async (t: Omit<Transaction, 'id' | 'createdAt'>) => {
-    if (!state.auth.userId) return;
-    const { data, error } = await supabase.from('finance').insert([{
-      user_id: state.auth.userId, type: t.type, category: t.category, value: t.value, date: t.date,
-      recurring: t.recurring, notes: t.notes, payment_method: t.paymentMethod, classification: t.classification
-    }]).select().single();
-    if (error) { console.error(error.message); return; }
-    if (data) setState(p => ({ ...p, finance: [{ ...data, paymentMethod: data.payment_method, linkedEventId: data.linked_event_id, createdAt: data.created_at }, ...p.finance] }));
+    if (!state.auth.userId) {
+      console.error("Erro: userId não disponível para adicionar transação");
+      return;
+    }
+    
+    console.log("Adicionando transação:", t);
+    
+    // Converter data para timestamp válido (adiciona hora 00:00:00)
+    const dateTimestamp = new Date(`${t.date}T00:00:00`).toISOString();
+    
+    const insertData = {
+      user_id: state.auth.userId, 
+      type: t.type, 
+      category: t.category, 
+      value: t.value, 
+      date: dateTimestamp,
+      recurring: t.recurring || false, 
+      notes: t.notes || '', 
+      payment_method: t.paymentMethod, 
+      classification: t.classification,
+      credit_card_id: t.creditCardId || null,
+      is_installment: t.isInstallment || false,
+      installment_count: t.installmentCount || null,
+      installment_number: t.installmentNumber || null,
+      original_transaction_id: t.originalTransactionId || null
+    };
+    
+    console.log("Dados a inserir no banco:", insertData);
+    
+    const { data, error } = await supabase.from('finance').insert([insertData]).select().single();
+    
+    if (error) { 
+      console.error("Erro ao adicionar transação:", error);
+      console.error("Detalhes do erro:", { code: error.code, message: error.message, details: error.details });
+      alert("Erro ao salvar despesa: " + (error.message || "Tente novamente"));
+      return;
+    }
+    
+    if (data) {
+      console.log("Transação adicionada com sucesso:", data);
+      setState(p => ({ 
+        ...p, 
+        finance: [{ 
+          ...data, 
+          paymentMethod: data.payment_method, 
+          linkedEventId: data.linked_event_id, 
+          creditCardId: data.credit_card_id, 
+          isInstallment: data.is_installment, 
+          installmentCount: data.installment_count, 
+          installmentNumber: data.installment_number, 
+          originalTransactionId: data.original_transaction_id, 
+          createdAt: data.created_at 
+        }, ...p.finance] 
+      }));
+    }
   };
 
   const updateTransaction = async (id: string, updates: Partial<Transaction>) => {
     if (!state.auth.userId) return;
+    
     const dbUpdates: any = {};
     if (updates.category !== undefined) dbUpdates.category = updates.category;
+    if (updates.value !== undefined) dbUpdates.value = updates.value;
+    if (updates.date !== undefined) dbUpdates.date = updates.date;
+    if (updates.type !== undefined) dbUpdates.type = updates.type;
+    if (updates.recurring !== undefined) dbUpdates.recurring = updates.recurring;
+    if (updates.notes !== undefined) dbUpdates.notes = updates.notes;
+    if (updates.paymentMethod !== undefined) dbUpdates.payment_method = updates.paymentMethod;
+    if (updates.classification !== undefined) dbUpdates.classification = updates.classification;
+    if (updates.creditCardId !== undefined) dbUpdates.credit_card_id = updates.creditCardId;
+    if (updates.isInstallment !== undefined) dbUpdates.is_installment = updates.isInstallment;
+    if (updates.installmentCount !== undefined) dbUpdates.installment_count = updates.installmentCount;
+    if (updates.installmentNumber !== undefined) dbUpdates.installment_number = updates.installmentNumber;
+    if (updates.originalTransactionId !== undefined) dbUpdates.original_transaction_id = updates.originalTransactionId;
+    
+    console.log("Atualizando transação", id, "com dados:", dbUpdates);
+    
     const { error } = await supabase.from('finance').update(dbUpdates).eq('id', id);
-    if (!error) setState(p => ({ ...p, finance: p.finance.map(t => t.id === id ? { ...t, ...updates } : t) }));
+    
+    if (error) {
+      console.error("Erro ao atualizar transação:", error);
+    } else {
+      console.log("Transação atualizada com sucesso");
+      setState(p => ({ ...p, finance: p.finance.map(t => t.id === id ? { ...t, ...updates } : t) }));
+    }
   };
 
   const deleteTransaction = async (id: string) => {
@@ -430,40 +525,128 @@ const App: React.FC = () => {
     setState(p => ({ ...p, shoppingList: items }));
   };
 
-  const updateProfile = async (profile: UserProfile, theme: 'light' | 'dark') => {
-    if (!state.auth.userId) return;
+  const updateProfile = async (profile: UserProfile, theme: 'light' | 'dark', creditCards?: CreditCard[]) => {
+    if (!state.auth.userId) {
+      console.error("Erro: userId não disponível");
+      return;
+    }
 
-    const { error } = await supabase.from('profiles').upsert({
+    console.log("Atualizando perfil com dados:", { fullName: profile.fullName, email: profile.email });
+
+    // Construir objeto apenas com campos não-vazios
+    const profileData: any = {
       id: state.auth.userId,
-      full_name: profile.fullName,
-      email: profile.email,
-      birth_date: profile.birthDate,
-      phone: profile.phone,
-      house_name: profile.houseName,
-      profile_image: profile.profileImage,
       theme: theme,
-      address_street: profile.address.street,
-      address_number: profile.address.number,
-      address_city: profile.address.city,
-      address_state: profile.address.state,
-      address_zip: profile.address.zip,
-      alarm_settings: profile.alarmSettings
-    });
+    };
+
+    // Adicionar apenas campos com valores válidos
+    if (profile.fullName?.trim()) profileData.full_name = profile.fullName;
+    if (profile.email?.trim()) profileData.email = profile.email;
+    if (profile.birthDate?.trim()) profileData.birth_date = profile.birthDate; // Evitar string vazia
+    if (profile.phone?.trim()) profileData.phone = profile.phone;
+    if (profile.houseName?.trim()) profileData.house_name = profile.houseName;
+    if (profile.profileImage?.trim()) profileData.profile_image = profile.profileImage;
+    if (profile.address?.street?.trim()) profileData.address_street = profile.address.street;
+    if (profile.address?.number?.trim()) profileData.address_number = profile.address.number;
+    if (profile.address?.city?.trim()) profileData.address_city = profile.address.city;
+    if (profile.address?.state?.trim()) profileData.address_state = profile.address.state;
+    if (profile.address?.zip?.trim()) profileData.address_zip = profile.address.zip;
+    if (profile.alarmSettings) profileData.alarm_settings = profile.alarmSettings;
+
+    console.log("Dados para enviar ao banco:", profileData);
+
+    const { data, error } = await supabase.from('profiles').upsert(profileData).select();
 
     if (error) {
-      console.error("Erro ao atualizar perfil no banco:", error.message);
-      // Mesmo com erro no banco, atualizamos o estado local para a UI responder
+      console.error("Erro ao atualizar perfil no banco:", error.message, error);
+    } else {
+      console.log("Perfil atualizado com sucesso:", data);
+    }
+
+    // Salvar cartões de crédito se fornecidos
+    if (creditCards !== undefined) {
+      await syncCreditCards(creditCards);
     }
 
     setState(prev => ({
       ...prev,
       profile: { ...profile },
-      theme
+      theme,
+      creditCards: creditCards !== undefined ? creditCards : prev.creditCards
     }));
 
     // Aplica o tema visualmente
     if (theme === 'dark') document.documentElement.classList.add('dark');
     else document.documentElement.classList.remove('dark');
+  };
+
+  const syncCreditCards = async (cards: CreditCard[]) => {
+    if (!state.auth.userId) return;
+
+    try {
+      // Obter cartões existentes no banco
+      const { data: existingCards, error: fetchError } = await supabase
+        .from('credit_cards')
+        .select('id')
+        .eq('user_id', state.auth.userId);
+
+      if (fetchError) {
+        console.error("Erro ao buscar cartões existentes:", fetchError.message);
+        return;
+      }
+
+      const existingIds = new Set((existingCards || []).map(c => c.id));
+      const incomingIds = new Set(cards.map(c => c.id).filter(id => !id.startsWith('card-')));
+
+      // Deletar cartões que não estão mais na lista
+      const toDelete = Array.from(existingIds).filter(id => !incomingIds.has(id));
+      if (toDelete.length > 0) {
+        const { error: deleteError } = await supabase
+          .from('credit_cards')
+          .delete()
+          .in('id', toDelete);
+        if (deleteError) console.error("Erro ao deletar cartões:", deleteError.message);
+      }
+
+      // Upsert cartões (adicionar ou atualizar)
+      for (const card of cards) {
+        if (card.id.startsWith('card-')) {
+          // Novo cartão: fazer insert (sem id, deixa Supabase gerar)
+          const dbCard = {
+            user_id: state.auth.userId,
+            name: card.name,
+            owner: card.owner,
+            card_type: card.cardType,
+            last_four_digits: card.lastFourDigits,
+            color: card.color,
+            is_active: card.isActive,
+            closing_day: card.closingDay
+          };
+          const { error: insertError } = await supabase
+            .from('credit_cards')
+            .insert([dbCard]);
+          if (insertError) console.error("Erro ao inserir cartão:", insertError.message);
+        } else {
+          // Cartão existente: fazer update
+          const dbCard = {
+            name: card.name,
+            owner: card.owner,
+            card_type: card.cardType,
+            last_four_digits: card.lastFourDigits,
+            color: card.color,
+            is_active: card.isActive,
+            closing_day: card.closingDay
+          };
+          const { error: updateError } = await supabase
+            .from('credit_cards')
+            .update(dbCard)
+            .eq('id', card.id);
+          if (updateError) console.error("Erro ao atualizar cartão:", updateError.message);
+        }
+      }
+    } catch (err) {
+      console.error("Erro ao sincronizar cartões:", err);
+    }
   };
 
   const navItems = [
@@ -549,7 +732,7 @@ const App: React.FC = () => {
           {activeTab === 'finance' && <FinanceView transactions={state.finance} tasks={state.tasks} creditCards={state.creditCards} onAdd={addTransaction} onUpdate={updateTransaction} onDelete={deleteTransaction} />}
           {activeTab === 'health' && <HealthView medications={state.medications} onAdd={addMedication} onUpdate={updateMedication} onTakeDose={takeMedicationDose} onDelete={deleteMedication} />}
           {activeTab === 'shopping' && <ShoppingView items={state.shoppingList} onUpdate={updateShopping} />}
-          {activeTab === 'settings' && <SettingsView state={state} onUpdate={(ns) => updateProfile(ns.profile, ns.theme)} onLogout={() => supabase.auth.signOut()} />}
+          {activeTab === 'settings' && <SettingsView state={state} onUpdate={(ns) => updateProfile(ns.profile, ns.theme, ns.creditCards)} onLogout={() => supabase.auth.signOut()} />}
         </main>
       </div>
 
