@@ -572,7 +572,6 @@ const App: React.FC = () => {
             };
             console.log('Medicamento atualizado:', updatedMed.name, 'doses:', updatedMed.doseHistory?.length);
             return updatedMed;
-            };
           }
           return m;
         })
