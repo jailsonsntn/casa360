@@ -38,43 +38,64 @@ const HealthView: React.FC<HealthViewProps> = ({ medications, onAdd, onUpdate, o
   const [alarmTimes, setAlarmTimes] = useState<string[]>([]);
 
   // Função para calcular horários dos alarmes baseado na frequência
-  const calculateAlarmTimes = (frequency: string) => {
+  const calculateAlarmTimes = (frequency: string, startTime?: string) => {
     const times: string[] = [];
-    const now = new Date();
-    const startHour = 8; // Começar às 8:00
+    
+    // Usar firstDoseTime se disponível, senão usar 08:00 como padrão
+    let startHour = 8;
+    let startMinute = 0;
+    
+    if (startTime) {
+      const [h, m] = startTime.split(':').map(Number);
+      startHour = h;
+      startMinute = m;
+    }
 
     if (frequency === '4h/4h') {
       // 6 doses por dia (cada 4 horas)
       for (let i = 0; i < 6; i++) {
-        const hour = (startHour + (i * 4)) % 24;
-        times.push(`${hour.toString().padStart(2, '0')}:00`);
+        const totalMinutes = (startHour * 60 + startMinute + (i * 4 * 60));
+        const hour = Math.floor(totalMinutes / 60) % 24;
+        const minute = totalMinutes % 60;
+        times.push(`${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`);
       }
     } else if (frequency === '6h/6h') {
       // 4 doses por dia (cada 6 horas)
       for (let i = 0; i < 4; i++) {
-        const hour = (startHour + (i * 6)) % 24;
-        times.push(`${hour.toString().padStart(2, '0')}:00`);
+        const totalMinutes = (startHour * 60 + startMinute + (i * 6 * 60));
+        const hour = Math.floor(totalMinutes / 60) % 24;
+        const minute = totalMinutes % 60;
+        times.push(`${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`);
       }
     } else if (frequency === '8h/8h') {
       // 3 doses por dia (cada 8 horas)
       for (let i = 0; i < 3; i++) {
-        const hour = (startHour + (i * 8)) % 24;
-        times.push(`${hour.toString().padStart(2, '0')}:00`);
+        const totalMinutes = (startHour * 60 + startMinute + (i * 8 * 60));
+        const hour = Math.floor(totalMinutes / 60) % 24;
+        const minute = totalMinutes % 60;
+        times.push(`${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`);
       }
     } else if (frequency === '12h/12h') {
       // 2 doses por dia (cada 12 horas)
-      times.push('08:00');
-      times.push('20:00');
+      for (let i = 0; i < 2; i++) {
+        const totalMinutes = (startHour * 60 + startMinute + (i * 12 * 60));
+        const hour = Math.floor(totalMinutes / 60) % 24;
+        const minute = totalMinutes % 60;
+        times.push(`${hour.toString().padStart(2, '0')}:${minute.toString().padStart(2, '0')}`);
+      }
+    } else if (frequency === '24h/24h') {
+      // 1 dose por dia (cada 24 horas)
+      times.push(`${startHour.toString().padStart(2, '0')}:${startMinute.toString().padStart(2, '0')}`);
     }
 
     return times;
   };
 
-  // Atualizar horários quando frequência muda
+  // Atualizar horários quando frequência ou firstDoseTime muda
   useEffect(() => {
-    const times = calculateAlarmTimes(freq);
+    const times = calculateAlarmTimes(freq, firstDoseTime);
     setAlarmTimes(times);
-  }, [freq]);
+  }, [freq, firstDoseTime]);
 
   useEffect(() => {
     if (editingMed) {
@@ -299,6 +320,7 @@ const HealthView: React.FC<HealthViewProps> = ({ medications, onAdd, onUpdate, o
                       <option value="6h/6h">6h</option>
                       <option value="8h/8h">8h</option>
                       <option value="12h/12h">12h</option>
+                      <option value="24h/24h">24h (1x ao dia)</option>
                     </select>
                   </div>
                 </div>
