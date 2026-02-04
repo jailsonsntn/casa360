@@ -163,7 +163,8 @@ const App: React.FC = () => {
         supabase.from('shopping_items').select('*').eq('user_id', userId),
         supabase.from('credit_cards').select('*').eq('user_id', userId).order('created_at', { ascending: false }),
         supabase.from('investments').select('*').eq('user_id', userId).order('created_at', { ascending: false }),
-        supabase.from('financial_goals').select('*').eq('user_id', userId).order('created_at', { ascending: false })
+        supabase.from('financial_goals').select('*').eq('user_id', userId).order('created_at', { ascending: false }),
+        supabase.from('medication_doses').select('*').eq('user_id', userId).order('taken_at', { ascending: false })
       ]);
 
       const profileData = results[0].status === 'fulfilled' && (results[0].value as any)?.data ? (results[0].value as any).data : null;
@@ -174,6 +175,7 @@ const App: React.FC = () => {
       const creditCardsRaw = results[5].status === 'fulfilled' && (results[5].value as any)?.data ? (results[5].value as any).data : [];
       const investmentsRaw = results[6].status === 'fulfilled' && (results[6].value as any)?.data ? (results[6].value as any).data : [];
       const goalsRaw = results[7].status === 'fulfilled' && (results[7].value as any)?.data ? (results[7].value as any).data : [];
+      const dosesRaw = results[8].status === 'fulfilled' && (results[8].value as any)?.data ? (results[8].value as any).data : [];
 
       const tasks: Task[] = (tasksRaw || []).map((t: any) => ({
         ...t,
@@ -201,7 +203,16 @@ const App: React.FC = () => {
         isActive: m.is_active !== undefined ? m.is_active : m.isActive,
         firstDoseTime: m.first_dose_time || m.firstDoseTime,
         firstDoseDate: m.first_dose_date || m.firstDoseDate,
-        alarmConfig: m.alarm_config || { enabled: false }
+        alarmConfig: m.alarm_config || { enabled: false },
+        doseHistory: (dosesRaw || [])
+          .filter((d: any) => d.medication_id === m.id)
+          .map((d: any) => ({
+            id: d.id,
+            medicationId: d.medication_id,
+            takenAt: d.taken_at,
+            notes: d.notes,
+            createdAt: d.created_at
+          }))
       }));
 
       const shoppingList: ShoppingItem[] = (shoppingRaw || []).map((s: any) => ({
@@ -509,10 +520,54 @@ const App: React.FC = () => {
     if (!state.auth.userId) return;
     const med = state.medications.find(m => m.id === id);
     if (!med || med.stockQuantity <= 0) return;
+    
     const newStock = med.stockQuantity - 1;
     const now = new Date().toISOString();
-    const { error } = await supabase.from('medications').update({ stock_quantity: newStock, last_taken: now }).eq('id', id);
-    if (!error) setState(p => ({ ...p, medications: p.medications.map(m => m.id === id ? { ...m, stockQuantity: newStock, lastTaken: now } : m) }));
+    
+    // Salvar histórico de dose
+    const { data: doseData, error: doseError } = await supabase
+      .from('medication_doses')
+      .insert({
+        user_id: state.auth.userId,
+        medication_id: id,
+        taken_at: now
+      })
+      .select()
+      .single();
+    
+    if (doseError) {
+      console.error('Erro ao salvar dose:', doseError);
+      return;
+    }
+    
+    // Atualizar medicação
+    const { error } = await supabase
+      .from('medications')
+      .update({ stock_quantity: newStock, last_taken: now })
+      .eq('id', id);
+    
+    if (!error && doseData) {
+      setState(p => ({
+        ...p,
+        medications: p.medications.map(m => {
+          if (m.id === id) {
+            const newDose = {
+              id: doseData.id,
+              medicationId: doseData.medication_id,
+              takenAt: doseData.taken_at,
+              createdAt: doseData.created_at
+            };
+            return {
+              ...m,
+              stockQuantity: newStock,
+              lastTaken: now,
+              doseHistory: [newDose, ...(m.doseHistory || [])]
+            };
+          }
+          return m;
+        })
+      }));
+    }
   };
 
   const deleteMedication = async (id: string) => {

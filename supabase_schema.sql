@@ -183,3 +183,18 @@ alter table financial_goals enable row level security;
 
 create policy "Users can CRUD own financial goals" on financial_goals
   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+-- MEDICATION DOSES TABLE (Histórico de doses tomadas)
+create table medication_doses (
+  id uuid default uuid_generate_v4() primary key,
+  user_id uuid references auth.users on delete cascade not null,
+  medication_id uuid references medications on delete cascade not null,
+  taken_at timestamp with time zone default timezone('utc'::text, now()) not null,
+  notes text,
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null
+);
+
+alter table medication_doses enable row level security;
+
+create policy "Users can CRUD own medication doses" on medication_doses
+  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);

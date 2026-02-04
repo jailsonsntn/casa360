@@ -68,6 +68,14 @@ export interface Task {
   createdAt: string;
 }
 
+export interface MedicationDose {
+  id: string;
+  medicationId: string;
+  takenAt: string;
+  notes?: string;
+  createdAt: string;
+}
+
 export interface Medication {
   id: string;
   name: string;
@@ -86,6 +94,7 @@ export interface Medication {
     nextDose?: string;
     lastNotified?: string;
   };
+  doseHistory?: MedicationDose[]; // Histórico de doses
 }
 
 export interface Transaction {

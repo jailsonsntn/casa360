@@ -238,6 +238,33 @@ const HealthView: React.FC<HealthViewProps> = ({ medications, onAdd, onUpdate, o
                   </div>
                 </div>
 
+                {/* Histórico de doses - últimas 5 */}
+                {med.doseHistory && med.doseHistory.length > 0 && (
+                  <div className="pt-2 border-t border-gray-100 dark:border-zinc-800">
+                    <div className="text-xs font-semibold text-gray-500 dark:text-zinc-400 mb-2 flex items-center gap-1">
+                      <CheckCircle2 size={10} />
+                      Últimas doses
+                    </div>
+                    <div className="flex flex-wrap gap-1">
+                      {med.doseHistory.slice(0, 5).map((dose, idx) => (
+                        <div
+                          key={dose.id}
+                          className="text-xs bg-green-50 dark:bg-green-900/20 text-green-700 dark:text-green-400 px-2 py-0.5 rounded border border-green-200 dark:border-green-800 flex items-center gap-1"
+                          title={new Date(dose.takenAt).toLocaleString('pt-BR')}
+                        >
+                          <CheckCircle2 size={10} className="text-green-600 dark:text-green-500" />
+                          {new Date(dose.takenAt).toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' })}
+                        </div>
+                      ))}
+                    </div>
+                    {med.doseHistory.length > 5 && (
+                      <p className="text-xs text-gray-500 dark:text-zinc-500 mt-1">
+                        +{med.doseHistory.length - 5} doses registradas
+                      </p>
+                    )}
+                  </div>
+                )}
+
                 <div className="flex gap-1 pt-1">
                   <button
                     onClick={() => handleTakeDose(med)}
