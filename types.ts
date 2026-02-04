@@ -84,6 +84,7 @@ export interface Medication {
     enabled: boolean;
     times?: string[];
     nextDose?: string;
+    lastNotified?: string;
   };
 }
 

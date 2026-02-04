@@ -31,29 +31,29 @@ const TimelineView: React.FC<TimelineViewProps> = ({ events }) => {
   return (
     <div className="space-y-6">
       <div className="flex justify-between items-center mb-6">
-        <h2 className="text-2xl font-bold text-slate-800">Linha do Tempo</h2>
-        <div className="p-2 bg-slate-100 rounded-xl">
-          <History className="w-6 h-6 text-slate-500" />
+        <h2 className="text-2xl font-bold text-slate-800 dark:text-zinc-100">Linha do Tempo</h2>
+        <div className="p-2 bg-slate-100 dark:bg-zinc-900 rounded-xl">
+          <History className="w-6 h-6 text-slate-500 dark:text-zinc-400" />
         </div>
       </div>
 
-      <div className="relative ml-4 border-l-2 border-slate-200 pl-8 space-y-8 pb-10">
+      <div className="relative ml-4 border-l-2 border-slate-200 dark:border-zinc-800 pl-8 space-y-8 pb-10">
         {sortedEvents.map((event, idx) => (
           <div key={event.id} className="relative group">
             {/* Timeline Dot */}
-            <div className={`absolute -left-[41px] top-0 p-2 rounded-full border-4 border-slate-50 ${getBg(event.eventType)} shadow-sm transition-transform group-hover:scale-110`}>
+            <div className={`absolute -left-[41px] top-0 p-2 rounded-full border-4 border-slate-50 dark:border-zinc-900 ${getBg(event.eventType)} shadow-sm transition-transform group-hover:scale-110`}>
               {getIcon(event.eventType)}
             </div>
             
-            <div className="bg-white p-4 rounded-2xl shadow-sm border border-slate-100">
+            <div className="bg-white dark:bg-zinc-900 p-4 rounded-2xl shadow-sm border border-slate-100 dark:border-zinc-800">
               <div className="flex justify-between items-start mb-1">
-                <h4 className="font-bold text-slate-800 text-sm">{event.title}</h4>
-                <span className="text-[10px] text-slate-400 font-medium whitespace-nowrap">
+                <h4 className="font-bold text-slate-800 dark:text-zinc-100 text-sm">{event.title}</h4>
+                <span className="text-[10px] text-slate-400 dark:text-zinc-500 font-medium whitespace-nowrap">
                   {new Date(event.date).toLocaleDateString()}
                 </span>
               </div>
-              <p className="text-xs text-slate-500">{event.description}</p>
-              <div className="mt-3 text-[9px] font-bold text-slate-300 uppercase tracking-widest">
+              <p className="text-xs text-slate-500 dark:text-zinc-400">{event.description}</p>
+              <div className="mt-3 text-[9px] font-bold text-slate-300 dark:text-zinc-600 uppercase tracking-widest">
                 {new Date(event.date).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
               </div>
             </div>
@@ -61,7 +61,7 @@ const TimelineView: React.FC<TimelineViewProps> = ({ events }) => {
         ))}
 
         {sortedEvents.length === 0 && (
-          <div className="text-center py-20 -ml-8 text-slate-400">
+          <div className="text-center py-20 -ml-8 text-slate-400 dark:text-zinc-500">
             <History className="w-12 h-12 mx-auto mb-4 opacity-20" />
             <p className="text-sm">Ainda não há registros automáticos.</p>
             <p className="text-xs mt-1">Sua atividade aparecerá aqui.</p>

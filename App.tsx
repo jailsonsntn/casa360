@@ -93,6 +93,9 @@ const App: React.FC = () => {
 
     const alarmInterval = setInterval(() => {
       const now = new Date();
+      const nowTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+      const todayKey = now.toISOString().slice(0, 10);
+      const nowKey = `${todayKey} ${nowTime}`;
 
       state.tasks.forEach(task => {
         if (task.status === 'pending' && task.dueDate && task.alarmConfig?.enabled) {
@@ -120,10 +123,35 @@ const App: React.FC = () => {
           }
         }
       });
+
+      state.medications.forEach(med => {
+        if (!med.isActive || !med.alarmConfig?.enabled) return;
+        const times = med.alarmConfig.times || [];
+        if (!times.includes(nowTime)) return;
+        if (med.alarmConfig.lastNotified === nowKey) return;
+
+        notificationService.playAlarmSound(state.profile.alarmSettings.soundType);
+        if (state.profile.alarmSettings.vibrationEnabled) {
+          notificationService.vibrate(state.profile.alarmSettings.vibrationIntensity);
+        }
+        notificationService.sendLocalNotification(
+          `Hora do medicamento: ${med.name}`,
+          `${med.dosage} para ${med.person} (${med.frequency})`,
+          false
+        );
+
+        setState(p => ({
+          ...p,
+          medications: p.medications.map(m => m.id === med.id ? {
+            ...m,
+            alarmConfig: { ...m.alarmConfig!, lastNotified: nowKey }
+          } : m)
+        }));
+      });
     }, 30000);
 
     return () => clearInterval(alarmInterval);
-  }, [state.auth.isLoggedIn, state.tasks, state.profile.alarmSettings]);
+  }, [state.auth.isLoggedIn, state.tasks, state.medications, state.profile.alarmSettings]);
 
   const fetchUserData = useCallback(async (userId: string, email: string) => {
     try {
@@ -244,6 +272,71 @@ const App: React.FC = () => {
     }
   }, []);
 
+  // Registrar Service Worker para alarmes em background
+  useEffect(() => {
+    const registerServiceWorker = async () => {
+      try {
+        if ('serviceWorker' in navigator) {
+          const reg = await navigator.serviceWorker.register('/public/sw.js', {
+            scope: '/'
+          });
+          console.log('Service Worker registrado com sucesso:', reg);
+        }
+      } catch (error) {
+        console.warn('Erro ao registrar Service Worker:', error);
+      }
+    };
+
+    registerServiceWorker();
+  }, []);
+
+  // Sincronizar medicamentos e configurações com Service Worker
+  useEffect(() => {
+    if (!state.auth.isLoggedIn || state.medications.length === 0) return;
+
+    const syncWithServiceWorker = async () => {
+      if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
+        navigator.serviceWorker.controller.postMessage({
+          type: 'UPDATE_MEDICATIONS',
+          payload: state.medications
+        });
+
+        navigator.serviceWorker.controller.postMessage({
+          type: 'UPDATE_ALARM_SETTINGS',
+          payload: {
+            soundType: state.profile.alarmSettings.soundType,
+            vibrationEnabled: state.profile.alarmSettings.vibrationEnabled,
+            vibrationIntensity: state.profile.alarmSettings.vibrationIntensity,
+            notificationsEnabled: state.profile.alarmSettings.notificationsEnabled
+          }
+        });
+
+        navigator.serviceWorker.controller.postMessage({
+          type: 'START_MONITORING'
+        });
+
+        console.log('Medicamentos sincronizados com Service Worker');
+      }
+    };
+
+    syncWithServiceWorker();
+  }, [state.medications, state.profile.alarmSettings, state.auth.isLoggedIn]);
+
+  // Receber mensagens do Service Worker
+  useEffect(() => {
+    if ('serviceWorker' in navigator) {
+      navigator.serviceWorker.addEventListener('message', (event) => {
+        const { type, payload } = event.data;
+
+        if (type === 'MEDICATION_ALARM') {
+          console.log('Alarme de medicamento acionado pelo SW:', payload);
+        } else if (type === 'MEDICATION_DOSE_RECORDED') {
+          console.log('Dose registrada via SW:', payload);
+        }
+      });
+    }
+  }, []);
+
   useEffect(() => {
     let mounted = true;
 
@@ -360,6 +453,7 @@ const App: React.FC = () => {
       min_stock: med.minStock || 5,
       first_dose_date: med.firstDoseDate || null,
       first_dose_time: med.firstDoseTime || null,
+      alarm_config: med.alarmConfig || { enabled: false },
       is_active: true
     }]).select().single();
 
@@ -401,6 +495,7 @@ const App: React.FC = () => {
     if (updates.minStock !== undefined) dbUpdates.min_stock = updates.minStock;
     if (updates.firstDoseDate !== undefined) dbUpdates.first_dose_date = updates.firstDoseDate;
     if (updates.firstDoseTime !== undefined) dbUpdates.first_dose_time = updates.firstDoseTime;
+    if (updates.alarmConfig !== undefined) dbUpdates.alarm_config = updates.alarmConfig;
 
     const { error } = await supabase.from('medications').update(dbUpdates).eq('id', id);
     if (error) {
@@ -678,8 +773,8 @@ const App: React.FC = () => {
   if (!state.auth.isLoggedIn) return <AuthView onLogin={() => { }} />;
 
   return (
-    <div className="flex min-h-screen bg-slate-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-800 font-sans text-slate-900 dark:text-slate-100 transition-all duration-500">
-      <aside className={`hidden md:flex flex-col bg-white dark:from-slate-900 dark:to-slate-800 border-r border-slate-200 dark:border-slate-700 fixed h-full z-20 transition-all duration-300 shadow-lg ${isSidebarCollapsed ? 'w-16' : 'w-56'}`}>
+    <div className="flex min-h-screen bg-gradient-to-br from-slate-50 via-slate-50 to-slate-100 dark:from-slate-950 dark:via-slate-900 dark:to-slate-800 font-sans text-slate-900 dark:text-slate-100 transition-all duration-500">
+      <aside className={`hidden md:flex flex-col bg-white dark:bg-slate-900 dark:from-slate-900 dark:to-slate-800 border-r border-slate-200 dark:border-slate-700 fixed h-full z-20 transition-all duration-300 shadow-lg ${isSidebarCollapsed ? 'w-16' : 'w-56'}`}>
         <div className={`p-5 border-b border-slate-100 dark:border-slate-800 flex items-center ${isSidebarCollapsed ? 'justify-center' : 'justify-between'}`}>
           {!isSidebarCollapsed && <h1 className="text-sm font-semibold text-indigo-600 dark:text-indigo-400 truncate tracking-tight">{state.profile.houseName || 'Casa360'}</h1>}
           <button onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)} className="p-1 text-slate-300">
@@ -708,7 +803,7 @@ const App: React.FC = () => {
       </aside>
 
       <div className={`flex-1 flex flex-col min-w-0 transition-all duration-300 ${isSidebarCollapsed ? 'md:ml-16' : 'md:ml-56'}`}>
-        <header className="sticky top-0 z-10 bg-white/90 dark:from-slate-900/80 dark:to-slate-800/80 backdrop-blur-lg border-b border-slate-200 dark:border-slate-700 px-4 md:px-6 py-4 flex justify-between items-center shadow-md">
+        <header className="sticky top-0 z-10 bg-white/90 dark:bg-slate-900/80 dark:from-slate-900/80 dark:to-slate-800/80 backdrop-blur-lg border-b border-slate-200 dark:border-slate-700 px-4 md:px-6 py-4 flex justify-between items-center shadow-md">
           <div className="flex items-center gap-3">
             <button onClick={() => setIsSidebarOpen(true)} className="p-2 text-slate-400 md:hidden"><Menu size={20} /></button>
             <h2 className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-widest hidden sm:block">
@@ -736,7 +831,7 @@ const App: React.FC = () => {
         </main>
       </div>
 
-      <nav className="md:hidden fixed bottom-4 left-4 right-4 z-[90] bg-white/95 dark:from-slate-900/95 dark:to-slate-800/95 backdrop-blur-lg border border-slate-200 dark:border-slate-700 shadow-xl rounded-3xl p-2 flex items-center justify-between">
+      <nav className="md:hidden fixed bottom-4 left-4 right-4 z-[90] bg-white/95 dark:bg-slate-900/95 dark:from-slate-900/95 dark:to-slate-800/95 backdrop-blur-lg border border-slate-200 dark:border-slate-700 shadow-xl rounded-3xl p-2 flex items-center justify-between">
         {navItems.map((item) => (
           <button key={item.id} onClick={() => setActiveTab(item.id as TabId)} className={`flex flex-col items-center justify-center w-12 h-12 rounded-2xl transition-all duration-200 hover:scale-110 ${activeTab === item.id ? 'text-white bg-gradient-to-br from-indigo-500 to-purple-600 shadow-lg' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'}`}>
             {item.icon}
