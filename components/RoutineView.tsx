@@ -136,14 +136,14 @@ const RoutineView: React.FC<RoutineViewProps> = ({ tasks, onAdd, onUpdate, onDel
     const firstDay = new Date(year, month, 1).getDay();
 
     return (
-      <div className="space-y-6 animate-in fade-in duration-500">
-        <div className="bg-white dark:bg-zinc-900 p-6 rounded-3xl border border-zinc-200 dark:border-zinc-800 shadow-sm">
-          <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
+      <div className="space-y-4 md:space-y-6 animate-in fade-in duration-500">
+        <div className="bg-white dark:bg-zinc-900 p-4 md:p-6 rounded-2xl md:rounded-3xl border border-zinc-200 dark:border-zinc-800 shadow-sm">
+          <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 md:gap-4">
             <div>
-              <h3 className="text-lg font-bold text-zinc-900 dark:text-zinc-100">Calendário</h3>
-              <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-1">Visualize suas tarefas por data</p>
+              <h3 className="text-base md:text-lg font-bold text-zinc-900 dark:text-zinc-100">Calendário</h3>
+              <p className="text-xs md:text-sm text-zinc-500 dark:text-zinc-400 mt-1">Visualize suas tarefas por data</p>
             </div>
-            <div className="flex gap-1 p-1 bg-zinc-100 dark:bg-zinc-800 rounded-2xl">
+            <div className="flex gap-1 p-1 bg-zinc-100 dark:bg-zinc-800 rounded-xl md:rounded-2xl w-full sm:w-auto">
               {(['day', 'week', 'month'] as CalendarSubView[]).map(v => (
                 <button
                   key={v}
@@ -420,40 +420,43 @@ const RoutineView: React.FC<RoutineViewProps> = ({ tasks, onAdd, onUpdate, onDel
       </div>
 
       {/* View Selector */}
-      <div className="bg-white dark:bg-zinc-900 rounded-3xl border border-zinc-200 dark:border-zinc-800 shadow-sm p-4">
-        <div className="flex gap-1 p-1 bg-zinc-100 dark:bg-zinc-800 rounded-2xl w-fit">
+      <div className="bg-white dark:bg-zinc-900 rounded-2xl md:rounded-3xl border border-zinc-200 dark:border-zinc-800 shadow-sm p-3 md:p-4">
+        <div className="flex gap-1 p-1 bg-zinc-100 dark:bg-zinc-800 rounded-xl md:rounded-2xl w-full md:w-fit">
           <button
             onClick={() => setView('kanban')}
-            className={`px-6 py-3 rounded-xl transition-all flex items-center gap-2 text-sm font-medium ${
+            className={`flex-1 md:flex-initial px-3 md:px-6 py-3 rounded-lg md:rounded-xl transition-all flex items-center justify-center md:gap-2 text-sm font-medium ${
               view === 'kanban'
                 ? 'bg-white dark:bg-zinc-700 text-indigo-600 shadow-sm'
                 : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'
             }`}
+            title="Kanban"
           >
             <Columns size={18} />
-            Kanban
+            <span className="hidden md:inline">Kanban</span>
           </button>
           <button
             onClick={() => setView('list')}
-            className={`px-6 py-3 rounded-xl transition-all flex items-center gap-2 text-sm font-medium ${
+            className={`flex-1 md:flex-initial px-3 md:px-6 py-3 rounded-lg md:rounded-xl transition-all flex items-center justify-center md:gap-2 text-sm font-medium ${
               view === 'list'
                 ? 'bg-white dark:bg-zinc-700 text-indigo-600 shadow-sm'
                 : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'
             }`}
+            title="Lista"
           >
             <ListIcon size={18} />
-            Lista
+            <span className="hidden md:inline">Lista</span>
           </button>
           <button
             onClick={() => setView('calendar')}
-            className={`px-6 py-3 rounded-xl transition-all flex items-center gap-2 text-sm font-medium ${
+            className={`flex-1 md:flex-initial px-3 md:px-6 py-3 rounded-lg md:rounded-xl transition-all flex items-center justify-center md:gap-2 text-sm font-medium ${
               view === 'calendar'
                 ? 'bg-white dark:bg-zinc-700 text-indigo-600 shadow-sm'
                 : 'text-zinc-500 hover:text-zinc-700 dark:hover:text-zinc-300'
             }`}
+            title="Calendário"
           >
             <CalIcon size={18} />
-            Calendário
+            <span className="hidden md:inline">Calendário</span>
           </button>
         </div>
       </div>

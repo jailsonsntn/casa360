@@ -81,19 +81,22 @@ const ShoppingView: React.FC<ShoppingViewProps> = ({ items, onUpdate }) => {
                 {pendingItems.length} itens pendentes • {completedItems.length} comprados
               </p>
             </div>
-            <div className="flex items-center gap-3">
+            <div className="flex items-center gap-2">
               <button
                 onClick={() => setShowCompleted(!showCompleted)}
-                className="px-4 py-2.5 rounded-xl font-semibold text-sm shadow-sm flex items-center gap-2 transition-all active:scale-95 bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 text-gray-700 dark:text-zinc-300 hover:bg-gray-50 dark:hover:bg-zinc-700"
+                className="px-3 md:px-4 py-2.5 rounded-xl font-semibold text-sm shadow-sm flex items-center justify-center md:gap-2 transition-all active:scale-95 bg-white dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 text-gray-700 dark:text-zinc-300 hover:bg-gray-50 dark:hover:bg-zinc-700"
+                title={showCompleted ? 'Ocultar Comprados' : 'Mostrar Comprados'}
               >
                 {showCompleted ? <CheckCircle2 size={16} /> : <Circle size={16} />}
-                {showCompleted ? 'Ocultar Comprados' : 'Mostrar Comprados'}
+                <span className="hidden md:inline">{showCompleted ? 'Ocultar Comprados' : 'Mostrar Comprados'}</span>
               </button>
               <button
                 onClick={() => setIsAdding(true)}
-                className="bg-indigo-600 text-white px-6 py-2.5 rounded-xl font-semibold text-sm shadow-sm flex items-center gap-2 hover:bg-indigo-700 transition-colors active:scale-95"
+                className="bg-indigo-600 text-white px-3 md:px-6 py-2.5 rounded-xl font-semibold text-sm shadow-sm flex items-center justify-center md:gap-2 hover:bg-indigo-700 transition-colors active:scale-95"
+                title="Novo Item"
               >
-                <Plus size={16} /> Novo Item
+                <Plus size={16} />
+                <span className="hidden md:inline">Novo Item</span>
               </button>
             </div>
           </div>
