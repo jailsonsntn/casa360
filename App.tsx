@@ -838,25 +838,24 @@ const App: React.FC = () => {
       </aside>
 
       <div className={`flex-1 flex flex-col min-w-0 transition-all duration-300 ${isSidebarCollapsed ? 'md:ml-16' : 'md:ml-56'}`}>
-        <header className="sticky top-0 z-10 bg-white/90 dark:bg-slate-900/80 dark:from-slate-900/80 dark:to-slate-800/80 backdrop-blur-lg border-b border-slate-200 dark:border-slate-700 px-4 md:px-6 py-4 flex justify-between items-center shadow-md">
-          <div className="flex items-center gap-3">
-            <button onClick={() => setIsSidebarOpen(true)} className="p-2 text-slate-400 md:hidden"><Menu size={20} /></button>
-            <h2 className="text-xs font-medium text-slate-500 dark:text-slate-400 uppercase tracking-widest hidden sm:block">
+        <header className="sticky top-0 z-10 bg-white/90 dark:bg-slate-900/80 backdrop-blur-lg border-b border-slate-200 dark:border-slate-700 px-3 md:px-6 py-3 md:py-4 flex justify-between items-center shadow-md">
+          <div className="flex items-center gap-2 md:gap-3 min-w-0 flex-1">
+            <h2 className="text-xs md:text-sm font-medium text-slate-800 dark:text-slate-200 uppercase tracking-wide truncate">
               {navItems.find(i => i.id === activeTab)?.label}
             </h2>
           </div>
-          <div className="flex items-center gap-3">
-            <div className="text-right hidden sm:block">
+          <div className="flex items-center gap-2 md:gap-3 shrink-0">
+            <div className="text-right hidden md:block">
               <p className="text-xs font-semibold text-slate-800 dark:text-slate-200 leading-none">{state.profile.fullName.split(' ')[0]}</p>
               <p className="text-xs text-slate-500 dark:text-slate-400 font-medium uppercase tracking-widest">Casa Ativa</p>
             </div>
-            <button onClick={() => setActiveTab('settings')} className="w-10 h-10 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center text-white font-semibold text-sm border-2 border-white dark:border-slate-700 shadow-lg hover:scale-110 transition-all duration-200 overflow-hidden">
+            <button onClick={() => setActiveTab('settings')} className="w-9 h-9 md:w-10 md:h-10 bg-gradient-to-br from-indigo-500 to-purple-600 rounded-xl flex items-center justify-center text-white font-semibold text-sm border-2 border-white dark:border-slate-700 shadow-lg hover:scale-110 transition-all duration-200 overflow-hidden shrink-0">
               {state.profile.profileImage ? <img src={state.profile.profileImage} alt="P" className="w-full h-full object-cover" /> : state.profile.fullName.charAt(0)}
             </button>
           </div>
         </header>
 
-        <main className="flex-1 p-4 md:p-6 max-w-full w-full mb-20 md:mb-0">
+        <main className="flex-1 p-3 md:p-6 max-w-full w-full mb-20 md:mb-0 overflow-x-hidden">
           {activeTab === 'dashboard' && <Dashboard state={state} onAction={() => setActiveTab('routine')} />}
           {activeTab === 'routine' && <RoutineView tasks={state.tasks} onAdd={addTask} onUpdate={updateTask} onDelete={deleteTask} />}
           {activeTab === 'finance' && <FinanceView transactions={state.finance} tasks={state.tasks} creditCards={state.creditCards} onAdd={addTransaction} onUpdate={updateTransaction} onDelete={deleteTransaction} />}
@@ -866,9 +865,9 @@ const App: React.FC = () => {
         </main>
       </div>
 
-      <nav className="md:hidden fixed bottom-4 left-4 right-4 z-[90] bg-white/95 dark:bg-slate-900/95 dark:from-slate-900/95 dark:to-slate-800/95 backdrop-blur-lg border border-slate-200 dark:border-slate-700 shadow-xl rounded-3xl p-2 flex items-center justify-between">
+      <nav className="md:hidden fixed bottom-3 left-3 right-3 z-[90] bg-white/95 dark:bg-slate-900/95 backdrop-blur-lg border border-slate-200 dark:border-slate-700 shadow-xl rounded-3xl p-2 flex items-center justify-around safe-bottom">
         {navItems.map((item) => (
-          <button key={item.id} onClick={() => setActiveTab(item.id as TabId)} className={`flex flex-col items-center justify-center w-12 h-12 rounded-2xl transition-all duration-200 hover:scale-110 ${activeTab === item.id ? 'text-white bg-gradient-to-br from-indigo-500 to-purple-600 shadow-lg' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'}`}>
+          <button key={item.id} onClick={() => setActiveTab(item.id as TabId)} className={`flex flex-col items-center justify-center w-14 h-14 rounded-2xl transition-all duration-200 active:scale-95 ${activeTab === item.id ? 'text-white bg-gradient-to-br from-indigo-500 to-purple-600 shadow-lg scale-105' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'}`}>
             {item.icon}
           </button>
         ))}

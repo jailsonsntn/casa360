@@ -278,35 +278,35 @@ const FinanceView: React.FC<FinanceViewProps> = ({ transactions, tasks, creditCa
   };
 
   return (
-    <div className="space-y-6 animate-in fade-in duration-500 pb-20 px-4">
+    <div className="space-y-4 md:space-y-6 animate-in fade-in duration-500 pb-20 px-2 md:px-4 max-w-full overflow-x-hidden">
       {/* Header com navegação */}
-      <div className="bg-white dark:bg-zinc-900 p-6 rounded-3xl border border-zinc-200 dark:border-zinc-800 shadow-sm">
-        <div className="flex flex-col sm:flex-row justify-between items-center gap-4">
+      <div className="bg-white dark:bg-zinc-900 p-4 md:p-6 rounded-2xl md:rounded-3xl border border-zinc-200 dark:border-zinc-800 shadow-sm">
+        <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3 md:gap-4">
           <div>
-            <h2 className="text-lg font-bold text-zinc-900 dark:text-zinc-100">Finanças</h2>
-            <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-1">Análise mensal e previsões</p>
+            <h2 className="text-base md:text-lg font-bold text-zinc-900 dark:text-zinc-100">Finanças</h2>
+            <p className="text-xs md:text-sm text-zinc-500 dark:text-zinc-400 mt-1">Análise mensal e previsões</p>
           </div>
-          <div className="flex gap-2">
-            <div className="flex items-center gap-1 p-1 bg-zinc-100 dark:bg-zinc-800 rounded-2xl">
+          <div className="flex flex-wrap gap-2 w-full sm:w-auto">
+            <div className="flex items-center gap-1 p-1 bg-zinc-100 dark:bg-zinc-800 rounded-xl md:rounded-2xl flex-1 sm:flex-initial">
               <button
                 onClick={() => selectedMonth === 0 ? (setSelectedYear(y => y - 1), setSelectedMonth(11)) : setSelectedMonth(m => m - 1)}
-                className="p-3 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded-xl text-zinc-500 transition-all"
+                className="p-2 md:p-3 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded-lg md:rounded-xl text-zinc-500 transition-all"
               >
                 <ArrowLeft size={16} />
               </button>
-              <span className="px-4 text-sm font-bold text-zinc-900 dark:text-zinc-100 min-w-[140px] text-center">
+              <span className="px-3 md:px-4 text-xs md:text-sm font-bold text-zinc-900 dark:text-zinc-100 min-w-[120px] md:min-w-[140px] text-center">
                 {monthNames[selectedMonth]} {selectedYear}
               </span>
               <button
                 onClick={() => selectedMonth === 11 ? (setSelectedYear(y => y + 1), setSelectedMonth(0)) : setSelectedMonth(m => m + 1)}
-                className="p-3 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded-xl text-zinc-500 transition-all"
+                className="p-2 md:p-3 hover:bg-zinc-200 dark:hover:bg-zinc-700 rounded-lg md:rounded-xl text-zinc-500 transition-all"
               >
                 <ArrowRight size={16} />
               </button>
             </div>
             <button
               onClick={() => { resetForm(); setIsAdding(true); }}
-              className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-sm font-medium transition-all flex items-center gap-2"
+              className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white rounded-xl text-xs md:text-sm font-medium transition-all flex items-center gap-2 flex-1 sm:flex-initial justify-center"
             >
               <Plus size={16} />
               Novo
@@ -316,48 +316,48 @@ const FinanceView: React.FC<FinanceViewProps> = ({ transactions, tasks, creditCa
       </div>
 
       {/* Mês Atual - Destaque */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        <div className="lg:col-span-2 space-y-6">
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-4 md:gap-6">
+        <div className="lg:col-span-2 space-y-4 md:space-y-6">
           {/* Cards de resumo mensal */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-            <div className="bg-gradient-to-br from-emerald-50 to-green-50 dark:from-emerald-900/20 dark:to-green-900/20 p-6 rounded-2xl border border-emerald-100 dark:border-emerald-800/30">
-              <div className="flex items-center gap-3 mb-2">
-                <div className="w-10 h-10 bg-emerald-100 dark:bg-emerald-900/30 rounded-lg flex items-center justify-center">
-                  <ArrowUpRight className="text-emerald-600" size={20} />
+          <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 md:gap-4">
+            <div className="bg-gradient-to-br from-emerald-50 to-green-50 dark:from-emerald-900/20 dark:to-green-900/20 p-4 md:p-6 rounded-xl md:rounded-2xl border border-emerald-100 dark:border-emerald-800/30">
+              <div className="flex items-center gap-2 md:gap-3 mb-2">
+                <div className="w-8 h-8 md:w-10 md:h-10 bg-emerald-100 dark:bg-emerald-900/30 rounded-lg flex items-center justify-center">
+                  <ArrowUpRight className="text-emerald-600" size={18} />
                 </div>
                 <p className="text-xs font-medium text-emerald-600 dark:text-emerald-400 uppercase tracking-wider">Entradas</p>
               </div>
-              <p className="text-2xl font-bold text-emerald-600">R$ {currentMonth.income.toLocaleString('pt-BR')}</p>
+              <p className="text-xl md:text-2xl font-bold text-emerald-600">R$ {currentMonth.income.toLocaleString('pt-BR')}</p>
             </div>
 
-            <div className="bg-gradient-to-br from-rose-50 to-red-50 dark:from-rose-900/20 dark:to-red-900/20 p-6 rounded-2xl border border-rose-100 dark:border-rose-800/30">
-              <div className="flex items-center gap-3 mb-2">
-                <div className="w-10 h-10 bg-rose-100 dark:bg-rose-900/30 rounded-lg flex items-center justify-center">
-                  <ArrowDownLeft className="text-rose-600" size={20} />
+            <div className="bg-gradient-to-br from-rose-50 to-red-50 dark:from-rose-900/20 dark:to-red-900/20 p-4 md:p-6 rounded-xl md:rounded-2xl border border-rose-100 dark:border-rose-800/30">
+              <div className="flex items-center gap-2 md:gap-3 mb-2">
+                <div className="w-8 h-8 md:w-10 md:h-10 bg-rose-100 dark:bg-rose-900/30 rounded-lg flex items-center justify-center">
+                  <ArrowDownLeft className="text-rose-600" size={18} />
                 </div>
                 <p className="text-xs font-medium text-rose-600 dark:text-rose-400 uppercase tracking-wider">Saídas</p>
               </div>
-              <p className="text-2xl font-bold text-rose-600">R$ {currentMonth.expense.toLocaleString('pt-BR')}</p>
+              <p className="text-xl md:text-2xl font-bold text-rose-600">R$ {currentMonth.expense.toLocaleString('pt-BR')}</p>
             </div>
 
-            <div className={`bg-gradient-to-br ${currentMonth.balance >= 0 ? 'from-indigo-50 to-blue-50 dark:from-indigo-900/20 dark:to-blue-900/20' : 'from-amber-50 to-yellow-50 dark:from-amber-900/20 dark:to-yellow-900/20'} p-6 rounded-2xl border ${currentMonth.balance >= 0 ? 'border-indigo-100 dark:border-indigo-800/30' : 'border-amber-100 dark:border-amber-800/30'}`}>
-              <div className="flex items-center gap-3 mb-2">
-                <div className={`w-10 h-10 ${currentMonth.balance >= 0 ? 'bg-indigo-100 dark:bg-indigo-900/30' : 'bg-amber-100 dark:bg-amber-900/30'} rounded-lg flex items-center justify-center`}>
-                  <Calculator className={currentMonth.balance >= 0 ? 'text-indigo-600' : 'text-amber-600'} size={20} />
+            <div className={`bg-gradient-to-br ${currentMonth.balance >= 0 ? 'from-indigo-50 to-blue-50 dark:from-indigo-900/20 dark:to-blue-900/20' : 'from-amber-50 to-yellow-50 dark:from-amber-900/20 dark:to-yellow-900/20'} p-4 md:p-6 rounded-xl md:rounded-2xl border ${currentMonth.balance >= 0 ? 'border-indigo-100 dark:border-indigo-800/30' : 'border-amber-100 dark:border-amber-800/30'}`}>
+              <div className="flex items-center gap-2 md:gap-3 mb-2">
+                <div className={`w-8 h-8 md:w-10 md:h-10 ${currentMonth.balance >= 0 ? 'bg-indigo-100 dark:bg-indigo-900/30' : 'bg-amber-100 dark:bg-amber-900/30'} rounded-lg flex items-center justify-center`}>
+                  <Calculator className={currentMonth.balance >= 0 ? 'text-indigo-600' : 'text-amber-600'} size={18} />
                 </div>
                 <p className={`text-xs font-medium uppercase tracking-wider ${currentMonth.balance >= 0 ? 'text-indigo-600 dark:text-indigo-400' : 'text-amber-600 dark:text-amber-400'}`}>
                   {currentMonth.balance >= 0 ? 'Superávit' : 'Déficit'}
                 </p>
               </div>
-              <p className={`text-2xl font-bold ${currentMonth.balance >= 0 ? 'text-indigo-600' : 'text-amber-600'}`}>
+              <p className={`text-xl md:text-2xl font-bold ${currentMonth.balance >= 0 ? 'text-indigo-600' : 'text-amber-600'}`}>
                 R$ {Math.abs(currentMonth.balance).toLocaleString('pt-BR')}
               </p>
             </div>
           </div>
 
           {/* Gráfico de tendência */}
-          <div className="bg-white dark:bg-zinc-900 p-6 rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-sm">
-            <h3 className="text-sm font-bold text-zinc-900 dark:text-zinc-100 mb-4 flex items-center gap-2">
+          <div className="bg-white dark:bg-zinc-900 p-4 md:p-6 rounded-xl md:rounded-2xl border border-zinc-200 dark:border-zinc-800 shadow-sm overflow-hidden">
+            <h3 className="text-xs md:text-sm font-bold text-zinc-900 dark:text-zinc-100 mb-4 flex items-center gap-2">
               <BarChart3 size={16} /> Tendência (6 meses)
             </h3>
             <ResponsiveContainer width="100%" height={300}>
