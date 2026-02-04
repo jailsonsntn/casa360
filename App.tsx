@@ -617,7 +617,42 @@ const App: React.FC = () => {
 
   const updateShopping = async (items: ShoppingItem[]) => {
     if (!state.auth.userId) return;
+    
+    // Atualizar estado local
     setState(p => ({ ...p, shoppingList: items }));
+    
+    // Deletar todos os itens existentes e inserir novos
+    const { error: deleteError } = await supabase
+      .from('shopping_items')
+      .delete()
+      .eq('user_id', state.auth.userId);
+    
+    if (deleteError) {
+      console.error('Erro ao deletar itens:', deleteError);
+      return;
+    }
+    
+    // Inserir novos itens
+    if (items.length > 0) {
+      const itemsToInsert = items.map(item => ({
+        user_id: state.auth.userId,
+        name: item.name,
+        category: item.category,
+        list_name: item.listName,
+        quantity: item.quantity,
+        unit: item.unit,
+        is_purchased: item.isPurchased,
+        auto_refill: item.autoRefill
+      }));
+      
+      const { error: insertError } = await supabase
+        .from('shopping_items')
+        .insert(itemsToInsert);
+      
+      if (insertError) {
+        console.error('Erro ao inserir itens:', insertError);
+      }
+    }
   };
 
   const updateProfile = async (profile: UserProfile, theme: 'light' | 'dark', creditCards?: CreditCard[]) => {
