@@ -125,7 +125,7 @@ const Dashboard: React.FC<DashboardProps> = ({ state, onAction }) => {
     return false;
   });
 
-  const lowStockMeds = state.medications.filter(m => m.stock <= m.minStock);
+  const lowStockMeds = state.medications.filter(m => m.stockQuantity <= m.minStock);
   const pendingShopping = state.shoppingList.filter(s => !s.isPurchased);
 
   // Dados para gráficos

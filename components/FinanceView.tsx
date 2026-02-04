@@ -147,7 +147,7 @@ const FinanceView: React.FC<FinanceViewProps> = ({ transactions, tasks, creditCa
     const cats: Record<string, { income: number; expense: number; count: number }> = {};
     
     monthsAnalysis.forEach(m => {
-      Object.entries(m.byCategory).forEach(([cat, values]) => {
+      Object.entries(m.byCategory).forEach(([cat, values]: [string, { income: number; expense: number }]) => {
         if (!cats[cat]) cats[cat] = { income: 0, expense: 0, count: 0 };
         cats[cat].income += values.income;
         cats[cat].expense += values.expense;
