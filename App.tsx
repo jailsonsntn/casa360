@@ -196,15 +196,8 @@ const App: React.FC = () => {
         createdAt: f.created_at || f.createdAt
       }));
 
-      const medications: Medication[] = (medsRaw || []).map((m: any) => ({
-        ...m,
-        minStock: m.min_stock !== undefined ? m.min_stock : m.minStock,
-        lastTaken: m.last_taken || m.lastTaken,
-        isActive: m.is_active !== undefined ? m.is_active : m.isActive,
-        firstDoseTime: m.first_dose_time || m.firstDoseTime,
-        firstDoseDate: m.first_dose_date || m.firstDoseDate,
-        alarmConfig: m.alarm_config || { enabled: false },
-        doseHistory: (dosesRaw || [])
+      const medications: Medication[] = (medsRaw || []).map((m: any) => {
+        const medDoses = (dosesRaw || [])
           .filter((d: any) => d.medication_id === m.id)
           .map((d: any) => ({
             id: d.id,
@@ -212,8 +205,21 @@ const App: React.FC = () => {
             takenAt: d.taken_at,
             notes: d.notes,
             createdAt: d.created_at
-          }))
-      }));
+          }));
+        
+        console.log(`Medicamento ${m.name}: ${medDoses.length} doses encontradas`);
+        
+        return {
+          ...m,
+          minStock: m.min_stock !== undefined ? m.min_stock : m.minStock,
+          lastTaken: m.last_taken || m.lastTaken,
+          isActive: m.is_active !== undefined ? m.is_active : m.isActive,
+          firstDoseTime: m.first_dose_time || m.firstDoseTime,
+          firstDoseDate: m.first_dose_date || m.firstDoseDate,
+          alarmConfig: m.alarm_config || { enabled: false },
+          doseHistory: medDoses
+        };
+      });
 
       const shoppingList: ShoppingItem[] = (shoppingRaw || []).map((s: any) => ({
         ...s,
@@ -547,6 +553,7 @@ const App: React.FC = () => {
       .eq('id', id);
     
     if (!error && doseData) {
+      console.log('Dose salva com sucesso:', doseData);
       setState(p => ({
         ...p,
         medications: p.medications.map(m => {
@@ -557,11 +564,14 @@ const App: React.FC = () => {
               takenAt: doseData.taken_at,
               createdAt: doseData.created_at
             };
-            return {
+            const updatedMed = {
               ...m,
               stockQuantity: newStock,
               lastTaken: now,
               doseHistory: [newDose, ...(m.doseHistory || [])]
+            };
+            console.log('Medicamento atualizado:', updatedMed.name, 'doses:', updatedMed.doseHistory?.length);
+            return updatedMed;
             };
           }
           return m;
