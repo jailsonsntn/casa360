@@ -12,7 +12,7 @@ import {
   Inbox,
   Home,
 } from 'lucide-react';
-import { supabase } from '../services/supabaseClient';
+import { isSupabaseConfigured, supabase } from '../services/supabaseClient';
 
 interface AuthViewProps {
   onLogin: (email: string, isNew?: boolean) => void;
@@ -29,6 +29,12 @@ const AuthView: React.FC<AuthViewProps> = ({ onLogin }) => {
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
+
+    if (!isSupabaseConfigured) {
+      setError('Login indisponível no momento. Configuração do Supabase ausente no deploy.');
+      return;
+    }
+
     setLoading(true);
     setError(null);
 
@@ -119,6 +125,13 @@ const AuthView: React.FC<AuthViewProps> = ({ onLogin }) => {
             </div>
           )}
 
+          {!isSupabaseConfigured && !error && (
+            <div className="bg-amber-50 border border-amber-200 p-3 rounded-xl flex items-center gap-2 text-amber-800 text-sm">
+              <AlertCircle className="w-4 h-4 shrink-0" />
+              Ambiente sem configuração de autenticação.
+            </div>
+          )}
+
           <form onSubmit={handleAuth} className="space-y-4">
             {mode === 'signup' && (
               <div className="space-y-2">
@@ -170,7 +183,7 @@ const AuthView: React.FC<AuthViewProps> = ({ onLogin }) => {
 
             <button
               type="submit"
-              disabled={loading}
+              disabled={loading || !isSupabaseConfigured}
               className="w-full bg-teal-600 text-white py-3 rounded-xl font-semibold text-sm hover:bg-teal-700 transition-colors disabled:opacity-60 flex items-center justify-center gap-2"
             >
               {loading ? (

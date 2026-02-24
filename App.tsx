@@ -29,7 +29,7 @@ import SettingsView from './components/SettingsView';
 import HealthView from './components/HealthView';
 import ShoppingView from './components/ShoppingView';
 import AuthView from './components/AuthView';
-import { supabase } from './services/supabaseClient';
+import { isSupabaseConfigured, supabase } from './services/supabaseClient';
 import { notificationService } from './services/notificationService';
 
 // Fix: Added missing vibrationIntensity to satisfy UserProfile interface requirement
@@ -393,6 +393,11 @@ const App: React.FC = () => {
   }, []);
 
   useEffect(() => {
+    if (!isSupabaseConfigured) {
+      setLoadingSession(false);
+      return;
+    }
+
     let mounted = true;
 
     // SAFETY NET: If session check hangs, quickly fallback to auth screen
