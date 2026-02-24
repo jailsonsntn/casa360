@@ -63,6 +63,7 @@ const FinanceView: React.FC<FinanceViewProps> = ({ transactions, tasks, creditCa
   const [installmentCount, setInstallmentCount] = useState(1);
 
   const monthNames = ["Janeiro", "Fevereiro", "Março", "Abril", "Maio", "Junho", "Julho", "Agosto", "Setembro", "Outubro", "Novembro", "Dezembro"];
+  const isCardPaymentMethod = (method: PaymentMethod) => method === 'credit_card' || method === 'debit_card';
 
   // Calcular análise de múltiplos meses
   const monthsAnalysis = useMemo(() => {
@@ -80,7 +81,7 @@ const FinanceView: React.FC<FinanceViewProps> = ({ transactions, tasks, creditCa
       // Previsões para meses fixos/recorrentes
       const projections: Transaction[] = [];
       const fixedMasters = transactions
-        .filter(t => (t.classification === 'fixed' || t.classification === 'recurring') && !t.isForecast)
+        .filter(t => (t.classification === 'fixed' || t.classification === 'recurring') && !t.isForecast && !isCardPaymentMethod(t.paymentMethod))
         .reduce((acc, curr) => {
           if (!acc[curr.category] || new Date(curr.date) > new Date(acc[curr.category].date)) {
             acc[curr.category] = curr;
@@ -191,11 +192,12 @@ const FinanceView: React.FC<FinanceViewProps> = ({ transactions, tasks, creditCa
       }
 
       const createTransaction = (installNum?: number) => {
+        const effectiveClassification: TransactionClassification = isCardPaymentMethod(paymentMethod) ? 'variable' : classification;
         const transactionValue = isInstallment ? numValue / installmentCount : numValue;
         return {
           type, category, value: transactionValue, date,
-          recurring: (classification === 'recurring' || classification === 'fixed'),
-          notes: '', paymentMethod, classification,
+          recurring: (effectiveClassification === 'recurring' || effectiveClassification === 'fixed'),
+          notes: '', paymentMethod, classification: effectiveClassification,
           creditCardId: paymentMethod === 'credit_card' ? selectedCreditCardId : undefined,
           isInstallment: isInstallment && installmentCount > 1,
           installmentCount: isInstallment && installmentCount > 1 ? installmentCount : undefined,
@@ -612,13 +614,22 @@ const FinanceView: React.FC<FinanceViewProps> = ({ transactions, tasks, creditCa
 
               <div className="space-y-1">
                 <label className="text-xs font-medium text-zinc-700 dark:text-zinc-300">Classificação</label>
-                <div className="grid grid-cols-3 gap-1">
+                <div className={`grid grid-cols-3 gap-1 ${isCardPaymentMethod(paymentMethod) ? 'opacity-50' : ''}`}>
                   {CLASSIFICATIONS.map(c => (
-                    <button key={c.id} type="button" onClick={() => setClassification(c.id)} className={`py-2 rounded-lg text-xs font-medium border transition-all ${classification === c.id ? 'bg-indigo-600 border-indigo-600 text-white shadow-sm' : 'bg-zinc-50 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 text-zinc-500 dark:text-zinc-400 hover:border-indigo-400'}`}>
+                    <button
+                      key={c.id}
+                      type="button"
+                      onClick={() => setClassification(c.id)}
+                      disabled={isCardPaymentMethod(paymentMethod)}
+                      className={`py-2 rounded-lg text-xs font-medium border transition-all ${classification === c.id ? 'bg-indigo-600 border-indigo-600 text-white shadow-sm' : 'bg-zinc-50 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 text-zinc-500 dark:text-zinc-400 hover:border-indigo-400'} ${isCardPaymentMethod(paymentMethod) ? 'cursor-not-allowed hover:border-zinc-200 dark:hover:border-zinc-700' : ''}`}
+                    >
                       {c.label}
                     </button>
                   ))}
                 </div>
+                {isCardPaymentMethod(paymentMethod) && (
+                  <p className="text-[11px] text-zinc-500 dark:text-zinc-400">Para cartão (crédito/débito), a classificação não se aplica.</p>
+                )}
               </div>
             </form>
 

@@ -3,7 +3,6 @@
 
 [![Vercel](https://img.shields.io/badge/Vercel-000000?style=for-the-badge&logo=vercel&logoColor=white)](https://casa360-eight.vercel.app/)
 [![React](https://img.shields.io/badge/React-20232A?style=for-the-badge&logo=react&logoColor=61DAFB)](https://reactjs.org/)
-[![Google Gemini](https://img.shields.io/badge/Google_Gemini-8E75B2?style=for-the-badge&logo=googlegemini&logoColor=white)](https://ai.google.dev/)
 [![Supabase](https://img.shields.io/badge/Supabase-3ECF8E?style=for-the-badge&logo=supabase&logoColor=white)](https://supabase.com/)
 
 O **Casa360** é um ecossistema digital projetado para centralizar e simplificar a gestão completa de uma residência. Unindo uma interface ultra-moderna (UI/UX) com o poder da Inteligência Artificial Generativa, o aplicativo oferece controle total sobre finanças, rotinas domésticas, saúde e suprimentos.
@@ -17,11 +16,6 @@ O deploy oficial está disponível em:
 ---
 
 ## ✨ Funcionalidades Principais
-
-### 🧠 Inteligência Artificial (Google Gemini API)
-*   **Insights de Casa**: Análise automática do seu comportamento financeiro e de tarefas para sugerir manutenções preventivas ou economias.
-*   **Clima Inteligente**: Consulta em tempo real (Grounding via Google Search) que fornece não apenas a temperatura, mas conselhos práticos (ex: "Bom dia para lavar roupas" ou "Prepare o guarda-chuva").
-*   **Fontes Confiáveis**: Exibição de links de referência para as informações geradas pela IA.
 
 ### 💰 Fluxo de Caixa Avançado
 *   **Visão Quinzenal**: Organização automática de receitas e despesas entre a 1ª e 2ª quinzena do mês.
@@ -58,7 +52,6 @@ O deploy oficial está disponível em:
 *   **Frontend**: React 19 + TypeScript.
 *   **Estilização**: Tailwind CSS (com darkMode class-based).
 *   **Backend & Auth**: Supabase (PostgreSQL + Auth + Storage).
-*   **IA**: Google Gemini 3 Flash Preview (via `@google/genai`).
 *   **Ícones**: Lucide React.
 *   **Deploy**: Vercel.
 
@@ -75,9 +68,8 @@ O deploy oficial está disponível em:
     npm install
     ```
 3.  **Configure as variáveis de ambiente**:
-    Crie um arquivo `.env` com suas chaves do Supabase e a Gemini API Key:
+    Crie um arquivo `.env` com suas chaves do Supabase:
     ```env
-    API_KEY=sua_gemini_api_key
     SUPABASE_URL=sua_url
     SUPABASE_ANON_KEY=sua_chave
     ```

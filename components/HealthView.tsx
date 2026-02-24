@@ -109,10 +109,7 @@ const HealthView: React.FC<HealthViewProps> = ({ medications, onAdd, onUpdate, o
   }, [editingMed]);
 
   useEffect(() => {
-    // Request notification permission on component mount
-    notificationService.requestPermission().then(granted => {
-      setNotificationEnabled(granted);
-    });
+    setNotificationEnabled(notificationService.getPermissionStatus() === 'granted');
   }, []);
 
   const resetForm = () => {
@@ -141,20 +138,21 @@ const HealthView: React.FC<HealthViewProps> = ({ medications, onAdd, onUpdate, o
 
   const handleTakeDose = (med: Medication) => {
     onTakeDose(med.id);
-    // Send notification reminder
-    if (notificationEnabled) {
-      notificationService.sendLocalNotification(
-        `Dose registrada: ${med.name}`,
-        `${med.dosage} para ${med.person} - Próxima dose em ${med.frequency}`,
-        false
-      );
-    }
+    if (!notificationEnabled) return;
+    notificationService.sendLocalNotification(
+      `Dose registrada: ${med.name}`,
+      `${med.dosage} para ${med.person} - Próxima dose em ${med.frequency}`,
+      false
+    );
   };
 
   const toggleNotifications = async () => {
     if (!notificationEnabled) {
-      const granted = await notificationService.requestPermission();
+      const granted = await notificationService.ensureNotificationPermission();
       setNotificationEnabled(granted);
+      if (!granted) {
+        alert('Permissão de notificação não concedida. Ative nas configurações do navegador/dispositivo.');
+      }
     } else {
       setNotificationEnabled(false);
     }

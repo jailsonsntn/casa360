@@ -189,6 +189,14 @@ async function checkAndTriggerAlarms() {
       return;
     }
 
+    if (settings.notificationsEnabled === false) {
+      return;
+    }
+
+    if (typeof Notification !== 'undefined' && Notification.permission !== 'granted') {
+      return;
+    }
+
     const now = new Date();
     const currentTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
     const todayKey = now.toISOString().slice(0, 10);

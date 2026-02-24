@@ -154,7 +154,16 @@ const SettingsView: React.FC<SettingsViewProps> = ({ state, onUpdate, onLogout }
     onUpdate({ ...state, theme: state.theme === 'light' ? 'dark' : 'light' });
   };
 
-  const handleAlarmChange = (field: keyof UserProfile['alarmSettings'], value: any) => {
+  const handleAlarmChange = async (field: keyof UserProfile['alarmSettings'], value: any) => {
+    if (field === 'notificationsEnabled' && value) {
+      const granted = await notificationService.ensureNotificationPermission();
+      if (!granted) {
+        setLocalProfile(prev => ({ ...prev, alarmSettings: { ...prev.alarmSettings, notificationsEnabled: false } }));
+        alert('Permissão de notificação não concedida. Ative nas configurações do navegador/dispositivo.');
+        return;
+      }
+    }
+
     setLocalProfile(prev => ({ ...prev, alarmSettings: { ...prev.alarmSettings, [field]: value } }));
 
     // Feedback imediato para testes de som/vibração
@@ -325,6 +334,19 @@ const SettingsView: React.FC<SettingsViewProps> = ({ state, onUpdate, onLogout }
               </div>
               <button onClick={() => handleAlarmChange('vibrationEnabled', !localProfile.alarmSettings.vibrationEnabled)} className={`w-12 h-6 rounded-full relative transition-all shadow-inner ${localProfile.alarmSettings.vibrationEnabled ? 'bg-indigo-600' : 'bg-zinc-300 dark:bg-zinc-700'}`}>
                 <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all shadow-sm ${localProfile.alarmSettings.vibrationEnabled ? 'right-1' : 'left-1'}`} />
+              </button>
+            </div>
+
+            <div className="flex items-center justify-between p-5 bg-zinc-50 dark:bg-zinc-800/30 rounded-xl border border-zinc-200 dark:border-zinc-800">
+              <div className="flex items-center gap-4">
+                <div className="p-2.5 bg-indigo-100 dark:bg-indigo-900/30 rounded-xl text-indigo-600 dark:text-indigo-400"><Bell size={20} /></div>
+                <div>
+                  <span className="text-sm font-bold text-zinc-800 dark:text-zinc-200 block">Notificações do Sistema</span>
+                  <span className="text-xs font-medium text-zinc-500">Web push/local para tarefas e saúde</span>
+                </div>
+              </div>
+              <button onClick={() => handleAlarmChange('notificationsEnabled', !localProfile.alarmSettings.notificationsEnabled)} className={`w-12 h-6 rounded-full relative transition-all shadow-inner ${localProfile.alarmSettings.notificationsEnabled ? 'bg-indigo-600' : 'bg-zinc-300 dark:bg-zinc-700'}`}>
+                <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all shadow-sm ${localProfile.alarmSettings.notificationsEnabled ? 'right-1' : 'left-1'}`} />
               </button>
             </div>
           </div>

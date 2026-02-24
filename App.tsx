@@ -99,25 +99,53 @@ const App: React.FC = () => {
 
       state.tasks.forEach(task => {
         if (task.status === 'pending' && task.dueDate && task.alarmConfig?.enabled) {
-          const taskDate = new Date(task.dueDate);
-          const diffMinutes = (now.getTime() - taskDate.getTime()) / 60000;
+          const alarmConfig = task.alarmConfig;
+          const scheduledTime = alarmConfig.scheduleType === 'range'
+            ? alarmConfig.startTime
+            : alarmConfig.time;
 
-          if (diffMinutes >= 0 && diffMinutes < 2 && task.alarmConfig.lastNotified !== now.getMinutes().toString()) {
-            notificationService.playAlarmSound(state.profile.alarmSettings.soundType);
-            if (state.profile.alarmSettings.vibrationEnabled) {
-              notificationService.vibrate(task.priority === 'high' ? 'urgent' : 'long');
+          let shouldNotify = false;
+          let scheduleLabel = '';
+
+          if (alarmConfig.recurring && (alarmConfig.recurringDays || []).includes(now.getDay()) && scheduledTime) {
+            const startDay = new Date(task.dueDate);
+            startDay.setHours(0, 0, 0, 0);
+            const today = new Date(now);
+            today.setHours(0, 0, 0, 0);
+
+            shouldNotify = today >= startDay && nowTime === scheduledTime;
+            scheduleLabel = scheduledTime;
+          } else {
+            const taskDate = new Date(task.dueDate);
+            if (scheduledTime) {
+              const [hour, minute] = scheduledTime.split(':').map(Number);
+              taskDate.setHours(hour || 0, minute || 0, 0, 0);
+              scheduleLabel = scheduledTime;
+            } else {
+              scheduleLabel = taskDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
             }
-            notificationService.sendLocalNotification(
-              `Tarefa: ${task.title}`,
-              `Horário agendado: ${taskDate.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}`,
-              task.priority === 'high'
-            );
+
+            const diffMinutes = (now.getTime() - taskDate.getTime()) / 60000;
+            shouldNotify = diffMinutes >= 0 && diffMinutes < 2;
+          }
+
+          if (shouldNotify && task.alarmConfig.lastNotified !== nowKey) {
+            notificationService.triggerAlarmFeedback({
+              title: `Tarefa: ${task.title}`,
+              body: `Horário agendado: ${scheduleLabel}`,
+              urgent: task.priority === 'high',
+              soundEnabled: task.alarmConfig.sound !== false,
+              soundType: state.profile.alarmSettings.soundType,
+              vibrationEnabled: state.profile.alarmSettings.vibrationEnabled && task.alarmConfig.vibration !== false,
+              vibrationType: task.priority === 'high' ? 'urgent' : 'long',
+              notificationsEnabled: state.profile.alarmSettings.notificationsEnabled
+            });
 
             setState(p => ({
               ...p,
               tasks: p.tasks.map(t => t.id === task.id ? {
                 ...t,
-                alarmConfig: { ...t.alarmConfig!, lastNotified: now.getMinutes().toString() }
+                alarmConfig: { ...t.alarmConfig!, lastNotified: nowKey }
               } : t)
             }));
           }
@@ -130,15 +158,16 @@ const App: React.FC = () => {
         if (!times.includes(nowTime)) return;
         if (med.alarmConfig.lastNotified === nowKey) return;
 
-        notificationService.playAlarmSound(state.profile.alarmSettings.soundType);
-        if (state.profile.alarmSettings.vibrationEnabled) {
-          notificationService.vibrate(state.profile.alarmSettings.vibrationIntensity);
-        }
-        notificationService.sendLocalNotification(
-          `Hora do medicamento: ${med.name}`,
-          `${med.dosage} para ${med.person} (${med.frequency})`,
-          false
-        );
+        notificationService.triggerAlarmFeedback({
+          title: `Hora do medicamento: ${med.name}`,
+          body: `${med.dosage} para ${med.person} (${med.frequency})`,
+          urgent: false,
+          soundEnabled: true,
+          soundType: state.profile.alarmSettings.soundType,
+          vibrationEnabled: state.profile.alarmSettings.vibrationEnabled,
+          vibrationType: state.profile.alarmSettings.vibrationIntensity,
+          notificationsEnabled: state.profile.alarmSettings.notificationsEnabled
+        });
 
         setState(p => ({
           ...p,
@@ -293,8 +322,8 @@ const App: React.FC = () => {
   useEffect(() => {
     const registerServiceWorker = async () => {
       try {
-        if ('serviceWorker' in navigator) {
-          const reg = await navigator.serviceWorker.register('/public/sw.js', {
+        if (notificationService.canUseBackgroundNotifications()) {
+          const reg = await navigator.serviceWorker.register('/sw.js', {
             scope: '/'
           });
           console.log('Service Worker registrado com sucesso:', reg);
@@ -309,16 +338,20 @@ const App: React.FC = () => {
 
   // Sincronizar medicamentos e configurações com Service Worker
   useEffect(() => {
-    if (!state.auth.isLoggedIn || state.medications.length === 0) return;
+    if (!state.auth.isLoggedIn || !notificationService.canUseBackgroundNotifications()) return;
 
     const syncWithServiceWorker = async () => {
-      if ('serviceWorker' in navigator && navigator.serviceWorker.controller) {
-        navigator.serviceWorker.controller.postMessage({
+      try {
+        const registration = await navigator.serviceWorker.ready;
+        const worker = registration.active || navigator.serviceWorker.controller;
+        if (!worker) return;
+
+        worker.postMessage({
           type: 'UPDATE_MEDICATIONS',
           payload: state.medications
         });
 
-        navigator.serviceWorker.controller.postMessage({
+        worker.postMessage({
           type: 'UPDATE_ALARM_SETTINGS',
           payload: {
             soundType: state.profile.alarmSettings.soundType,
@@ -328,11 +361,13 @@ const App: React.FC = () => {
           }
         });
 
-        navigator.serviceWorker.controller.postMessage({
-          type: 'START_MONITORING'
+        worker.postMessage({
+          type: state.profile.alarmSettings.notificationsEnabled ? 'START_MONITORING' : 'STOP_MONITORING'
         });
 
         console.log('Medicamentos sincronizados com Service Worker');
+      } catch (error) {
+        console.warn('Falha na sincronização com Service Worker:', error);
       }
     };
 
@@ -341,29 +376,32 @@ const App: React.FC = () => {
 
   // Receber mensagens do Service Worker
   useEffect(() => {
-    if ('serviceWorker' in navigator) {
-      navigator.serviceWorker.addEventListener('message', (event) => {
-        const { type, payload } = event.data;
+    if (!notificationService.canUseBackgroundNotifications()) return;
 
-        if (type === 'MEDICATION_ALARM') {
-          console.log('Alarme de medicamento acionado pelo SW:', payload);
-        } else if (type === 'MEDICATION_DOSE_RECORDED') {
-          console.log('Dose registrada via SW:', payload);
-        }
-      });
-    }
+    const onSWMessage = (event: MessageEvent) => {
+      const { type, payload } = event.data || {};
+
+      if (type === 'MEDICATION_ALARM') {
+        console.log('Alarme de medicamento acionado pelo SW:', payload);
+      } else if (type === 'MEDICATION_DOSE_RECORDED') {
+        console.log('Dose registrada via SW:', payload);
+      }
+    };
+
+    navigator.serviceWorker.addEventListener('message', onSWMessage);
+    return () => navigator.serviceWorker.removeEventListener('message', onSWMessage);
   }, []);
 
   useEffect(() => {
     let mounted = true;
 
-    // SAFETY NET: If session check hangs for more than 5s, we force stop loading
+    // SAFETY NET: If session check hangs, quickly fallback to auth screen
     const safetyTimeout = setTimeout(() => {
       if (mounted && loadingSession) {
         console.warn("Session check timed out, forcing login screen.");
         setLoadingSession(false);
       }
-    }, 5000);
+    }, 1200);
 
     const handleAuthChange = async (session: any) => {
       if (!mounted) return;
@@ -417,7 +455,8 @@ const App: React.FC = () => {
       due_date: task.dueDate,
       recurrence: task.recurrence,
       status: task.status,
-      priority: task.priority
+      priority: task.priority,
+      alarm_config: task.alarmConfig || { enabled: false, sound: true, vibration: true, triggered: false }
     }]).select().single();
 
     if (error) {
@@ -428,7 +467,7 @@ const App: React.FC = () => {
     if (data) {
       setState(prev => ({
         ...prev,
-        tasks: [{ ...data, dueDate: data.due_date, alarmConfig: task.alarmConfig || { enabled: false }, createdAt: data.created_at }, ...prev.tasks]
+        tasks: [{ ...data, dueDate: data.due_date, alarmConfig: data.alarm_config || task.alarmConfig || { enabled: false }, createdAt: data.created_at }, ...prev.tasks]
       }));
     }
   };
@@ -443,6 +482,7 @@ const App: React.FC = () => {
     if (updates.priority !== undefined) dbUpdates.priority = updates.priority;
     if (updates.dueDate !== undefined) dbUpdates.due_date = updates.dueDate;
     if (updates.recurrence !== undefined) dbUpdates.recurrence = updates.recurrence;
+    if (updates.alarmConfig !== undefined) dbUpdates.alarm_config = updates.alarmConfig;
 
     const { error } = await supabase.from('tasks').update(dbUpdates).eq('id', id);
     if (error) {
@@ -859,12 +899,14 @@ const App: React.FC = () => {
 
   if (loadingSession) {
     return (
-      <div className="fixed inset-0 bg-gradient-to-br from-indigo-50 via-blue-50 to-purple-50 dark:from-slate-950 dark:via-slate-900 dark:to-slate-800 flex flex-col items-center justify-center gap-6 z-[200] animate-fade-in">
-        <div className="relative">
-          <Loader2 className="w-12 h-12 text-indigo-600 animate-spin" />
-          <div className="absolute inset-0 w-12 h-12 border-4 border-purple-300 rounded-full animate-ping opacity-20"></div>
+      <div className="fixed inset-0 bg-stone-50 flex flex-col items-center justify-center gap-5 z-[200] animate-fade-in">
+        <div className="w-14 h-14 rounded-full border-2 border-teal-100 bg-white flex items-center justify-center shadow-sm">
+          <Loader2 className="w-7 h-7 text-teal-600 animate-spin" />
         </div>
-        <p className="text-sm font-medium text-slate-600 dark:text-slate-400 uppercase tracking-widest animate-pulse">Sincronizando</p>
+        <div className="text-center">
+          <p className="text-xs font-semibold text-slate-500 uppercase tracking-[0.22em]">Preparando seu acesso</p>
+          <p className="mt-1 text-sm text-slate-600">Só um instante…</p>
+        </div>
       </div>
     );
   }

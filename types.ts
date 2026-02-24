@@ -63,6 +63,12 @@ export interface Task {
     vibration: boolean;
     triggered: boolean;
     lastNotified?: string;
+    scheduleType?: 'single' | 'range';
+    time?: string;
+    startTime?: string;
+    endTime?: string;
+    recurring?: boolean;
+    recurringDays?: number[];
   };
   points: number;
   createdAt: string;

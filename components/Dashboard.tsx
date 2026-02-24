@@ -9,14 +9,7 @@ import {
   HeartPulse,
   ShoppingBag,
   ArrowRight,
-  Sun,
-  Cloud,
-  CloudRain,
-  CloudLightning,
-  Snowflake,
-  MapPin,
   AlertCircle,
-  ExternalLink,
   Wallet,
   Calendar,
   Target,
@@ -29,7 +22,6 @@ import {
   Circle,
   Zap
 } from 'lucide-react';
-import { getWeatherInfo, WeatherData } from '../services/geminiService';
 import {
   PieChart as RechartsPieChart,
   Pie,
@@ -53,46 +45,11 @@ interface DashboardProps {
 }
 
 const Dashboard: React.FC<DashboardProps> = ({ state, onAction }) => {
-  const [weather, setWeather] = useState<WeatherData | null>(null);
-  const [loadingWeather, setLoadingWeather] = useState(false);
-
-  useEffect(() => {
-    const fetchWeather = async () => {
-      if (state.profile.address.city && state.profile.address.state) {
-        setLoadingWeather(true);
-        const data = await getWeatherInfo(state.profile.address.city, state.profile.address.state);
-        if (data) setWeather(data);
-        setLoadingWeather(false);
-      }
-    };
-    fetchWeather();
-  }, [state.profile.address.city, state.profile.address.state]);
-
   const getGreeting = () => {
     const hours = new Date().getHours();
     if (hours >= 6 && hours < 12) return 'Bom dia';
     if (hours >= 12 && hours < 18) return 'Boa tarde';
     return 'Boa noite';
-  };
-
-  const getWeatherIcon = (condition: string) => {
-    switch (condition) {
-      case 'sunny': return <Sun className="w-8 h-8 text-amber-400" />;
-      case 'cloudy': return <Cloud className="w-8 h-8 text-slate-400" />;
-      case 'rainy': return <CloudRain className="w-8 h-8 text-indigo-400" />;
-      case 'storm': return <CloudLightning className="w-8 h-8 text-purple-400" />;
-      case 'snow': return <Snowflake className="w-8 h-8 text-sky-300" />;
-      default: return <Sun className="w-8 h-8 text-amber-400" />;
-    }
-  };
-
-  const getWeatherBg = (condition: string) => {
-    switch (condition) {
-      case 'sunny': return 'bg-amber-50/50 border-amber-100 dark:bg-amber-900/10 dark:border-amber-900/20';
-      case 'cloudy': return 'bg-slate-50/50 border-slate-100 dark:bg-slate-800/40 dark:border-slate-800';
-      case 'rainy': return 'bg-indigo-50/50 border-indigo-100 dark:bg-indigo-900/10 dark:border-indigo-900/20';
-      default: return 'bg-white border-slate-100 dark:bg-slate-900 dark:border-slate-800';
-    }
   };
 
   // Cálculos aprimorados para métricas
@@ -163,17 +120,6 @@ const Dashboard: React.FC<DashboardProps> = ({ state, onAction }) => {
             Aqui está o resumo do seu dia
           </p>
         </div>
-
-        {/* Weather aprimorado */}
-        {weather && (
-          <div className={`flex items-center gap-3 px-4 py-3 rounded-2xl border shadow-sm transition-all hover:shadow-md ${getWeatherBg(weather.condition)}`}>
-            {getWeatherIcon(weather.condition)}
-            <div>
-              <div className="font-semibold text-slate-900 dark:text-zinc-100">{weather.temp}</div>
-              <div className="text-sm text-slate-600 dark:text-zinc-400">{weather.description}</div>
-            </div>
-          </div>
-        )}
       </header>
 
       {/* Grid principal com métricas visuais */}

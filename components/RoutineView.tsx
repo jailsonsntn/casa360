@@ -20,8 +20,11 @@ import {
   CalendarDays,
   Trash2,
   GripVertical,
-  Calendar as CalendarIcon
+  Calendar as CalendarIcon,
+  Repeat,
+  AlertCircle
 } from 'lucide-react';
+import { notificationService } from '../services/notificationService';
 
 interface RoutineViewProps {
   tasks: Task[];
@@ -44,37 +47,153 @@ const RoutineView: React.FC<RoutineViewProps> = ({ tasks, onAdd, onUpdate, onDel
   // Form States
   const [title, setTitle] = useState('');
   const [resp, setResp] = useState('');
-  const [date, setDate] = useState(new Date().toISOString().slice(0, 16));
+  const [dueDateOnly, setDueDateOnly] = useState(new Date().toISOString().slice(0, 10));
   const [status, setStatus] = useState<TaskStatus>('pending');
   const [priority, setPriority] = useState<PriorityLevel>('medium');
   const [alarmEnabled, setAlarmEnabled] = useState(false);
+  const [isRecurring, setIsRecurring] = useState(false);
+  const [recurringDays, setRecurringDays] = useState<number[]>([]);
+  const [hasTimeWindow, setHasTimeWindow] = useState(false);
+  const [startTime, setStartTime] = useState('');
+  const [endTime, setEndTime] = useState('');
+
+  const weekDays = [
+    { label: 'Seg', value: 1 },
+    { label: 'Ter', value: 2 },
+    { label: 'Qua', value: 3 },
+    { label: 'Qui', value: 4 },
+    { label: 'Sex', value: 5 },
+    { label: 'Sáb', value: 6 },
+    { label: 'Dom', value: 0 }
+  ];
+
+  const hasScheduleConfigured = !!startTime && !!endTime;
+  const missingNotificationSchedule = alarmEnabled && !hasScheduleConfigured;
+  const missingTimeWindowValues = hasTimeWindow && !hasScheduleConfigured;
+  const invalidTimeWindow = hasTimeWindow && hasScheduleConfigured && endTime <= startTime;
+  const missingRecurringDays = isRecurring && recurringDays.length === 0;
+  const isSubmitDisabled = !title.trim() || !dueDateOnly || missingNotificationSchedule || missingTimeWindowValues || invalidTimeWindow || missingRecurringDays;
+
+  const getTaskScheduleLabel = (task: Task) => {
+    const config = task.alarmConfig;
+    if (config?.scheduleType === 'range' && config.startTime && config.endTime) {
+      return `${config.startTime} às ${config.endTime}`;
+    }
+    if (config?.scheduleType === 'single' && config.time) {
+      return config.time;
+    }
+    const due = new Date(task.dueDate);
+    if (due.getHours() !== 0 || due.getMinutes() !== 0) {
+      return due.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+    }
+    return 'Sem horário';
+  };
+
+  const getTaskOccurrenceDateTime = (task: Task, targetDate: Date) => {
+    const occurrence = new Date(targetDate);
+    const config = task.alarmConfig;
+    let time = '';
+
+    if (config?.scheduleType === 'range') time = config.startTime || '';
+    else if (config?.scheduleType === 'single') time = config.time || '';
+
+    if (time) {
+      const [hour, minute] = time.split(':').map(Number);
+      occurrence.setHours(hour || 0, minute || 0, 0, 0);
+      return occurrence;
+    }
+
+    const due = new Date(task.dueDate);
+    occurrence.setHours(due.getHours(), due.getMinutes(), 0, 0);
+    return occurrence;
+  };
+
+  const taskOccursOnDate = (task: Task, targetDate: Date) => {
+    const due = new Date(task.dueDate);
+    const dueDay = new Date(due);
+    dueDay.setHours(0, 0, 0, 0);
+    const selectedDay = new Date(targetDate);
+    selectedDay.setHours(0, 0, 0, 0);
+
+    if (task.alarmConfig?.recurring) {
+      const days = task.alarmConfig.recurringDays || [];
+      return selectedDay >= dueDay && days.includes(targetDate.getDay());
+    }
+
+    return due.toDateString() === targetDate.toDateString();
+  };
+
+  const toggleRecurringDay = (day: number) => {
+    setRecurringDays(prev => prev.includes(day) ? prev.filter(d => d !== day) : [...prev, day].sort((a, b) => a - b));
+  };
 
   useEffect(() => {
     if (editingTask) {
+      const alarmConfig = editingTask.alarmConfig;
+      const due = new Date(editingTask.dueDate);
       setTitle(editingTask.title || '');
       setResp(editingTask.responsible || '');
-      setDate(new Date(editingTask.dueDate).toISOString().slice(0, 16));
+      setDueDateOnly(due.toISOString().slice(0, 10));
       setStatus(editingTask.status || 'pending');
       setPriority(editingTask.priority || 'medium');
-      setAlarmEnabled(editingTask.alarmConfig?.enabled || false);
+      setAlarmEnabled(alarmConfig?.enabled || false);
+      setIsRecurring(alarmConfig?.recurring || editingTask.recurrence === 'weekly');
+      setRecurringDays(alarmConfig?.recurringDays || []);
+      const fallbackTime = `${due.getHours().toString().padStart(2, '0')}:${due.getMinutes().toString().padStart(2, '0')}`;
+      if (alarmConfig?.scheduleType === 'range' && alarmConfig.startTime && alarmConfig.endTime) {
+        setHasTimeWindow(true);
+        setStartTime(alarmConfig.startTime);
+        setEndTime(alarmConfig.endTime);
+      } else if (alarmConfig?.time) {
+        setHasTimeWindow(true);
+        setStartTime(alarmConfig.time);
+        setEndTime(alarmConfig.time);
+      } else if (due.getHours() !== 0 || due.getMinutes() !== 0) {
+        setHasTimeWindow(true);
+        setStartTime(fallbackTime);
+        setEndTime(fallbackTime);
+      } else {
+        setHasTimeWindow(false);
+        setStartTime('');
+        setEndTime('');
+      }
       setIsAdding(true);
     }
   }, [editingTask]);
 
   const resetForm = () => {
-    setTitle(''); setResp(''); setDate(new Date().toISOString().slice(0, 16));
+    setTitle(''); setResp(''); setDueDateOnly(new Date().toISOString().slice(0, 10));
     setStatus('pending'); setPriority('medium'); setAlarmEnabled(false);
+    setIsRecurring(false); setRecurringDays([]);
+    setHasTimeWindow(false); setStartTime(''); setEndTime('');
     setEditingTask(null); setIsAdding(false);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!title.trim()) return;
+    if (isSubmitDisabled) return;
+
+    const selectedStartTime = hasTimeWindow ? startTime : '00:00';
+    const dueDateTime = new Date(`${dueDateOnly}T${selectedStartTime}`);
+
+    const taskAlarmConfig = {
+      enabled: alarmEnabled,
+      sound: true,
+      vibration: true,
+      triggered: false,
+      scheduleType: hasTimeWindow ? 'range' as const : undefined,
+      time: hasTimeWindow ? startTime : undefined,
+      startTime: hasTimeWindow ? startTime : undefined,
+      endTime: hasTimeWindow ? endTime : undefined,
+      recurring: isRecurring,
+      recurringDays: isRecurring ? recurringDays : []
+    };
+
     const taskData = {
       title, description: '', responsible: resp || 'Residente',
-      dueDate: new Date(date).toISOString(),
-      recurrence: 'none' as RecurrenceType, status, priority,
-      alarmConfig: { enabled: alarmEnabled, sound: true, vibration: true, triggered: false },
+      dueDate: dueDateTime.toISOString(),
+      recurrence: (isRecurring ? 'weekly' : 'none') as RecurrenceType, status, priority,
+      alarmConfig: taskAlarmConfig,
       points: priority === 'high' ? 50 : 20
     };
     if (editingTask) onUpdate(editingTask.id, taskData);
@@ -85,7 +204,7 @@ const RoutineView: React.FC<RoutineViewProps> = ({ tasks, onAdd, onUpdate, onDel
   const toggleTaskStatus = (task: Task) => {
     const newStatus: TaskStatus = task.status === 'completed' ? 'pending' : 'completed';
     onUpdate(task.id, { status: newStatus });
-    if (newStatus === 'completed' && 'vibrate' in navigator) navigator.vibrate([10, 50, 10]);
+    if (newStatus === 'completed') notificationService.vibrate('short');
   };
 
   const stages: { id: TaskStatus, label: string, color: string }[] = [
@@ -191,9 +310,9 @@ const RoutineView: React.FC<RoutineViewProps> = ({ tasks, onAdd, onUpdate, onDel
               ))}
               {Array.from({ length: daysInMonth }).map((_, i) => {
                 const day = i + 1;
+                const dayDate = new Date(year, month, day);
                 const dayTasks = tasks.filter(t => {
-                  const d = new Date(t.dueDate);
-                  return d.getDate() === day && d.getMonth() === month && d.getFullYear() === year;
+                  return taskOccursOnDate(t, dayDate);
                 });
                 return (
                   <div
@@ -219,7 +338,7 @@ const RoutineView: React.FC<RoutineViewProps> = ({ tasks, onAdd, onUpdate, onDel
               <h4 className="text-sm font-bold text-zinc-400 uppercase tracking-widest text-center border-b border-zinc-100 dark:border-zinc-800 pb-4">
                 Agenda: {currentDate.toLocaleDateString('pt-BR', { weekday: 'long', day: 'numeric', month: 'long' })}
               </h4>
-              {tasks.filter(t => new Date(t.dueDate).toDateString() === currentDate.toDateString()).length === 0 ? (
+              {tasks.filter(t => taskOccursOnDate(t, currentDate)).length === 0 ? (
                 <div className="text-center py-20 opacity-50">
                   <CalendarIcon size={48} className="mx-auto text-zinc-300 dark:text-zinc-600 mb-4" />
                   <div className="text-sm font-medium uppercase tracking-wider text-zinc-400">Nada planejado</div>
@@ -227,8 +346,8 @@ const RoutineView: React.FC<RoutineViewProps> = ({ tasks, onAdd, onUpdate, onDel
                 </div>
               ) : (
                 <div className="space-y-3">
-                  {tasks.filter(t => new Date(t.dueDate).toDateString() === currentDate.toDateString())
-                    .sort((a, b) => new Date(a.dueDate).getTime() - new Date(b.dueDate).getTime())
+                  {tasks.filter(t => taskOccursOnDate(t, currentDate))
+                    .sort((a, b) => getTaskOccurrenceDateTime(a, currentDate).getTime() - getTaskOccurrenceDateTime(b, currentDate).getTime())
                     .map(t => (
                       <div
                         key={t.id}
@@ -236,7 +355,7 @@ const RoutineView: React.FC<RoutineViewProps> = ({ tasks, onAdd, onUpdate, onDel
                         className="flex items-center gap-4 p-4 bg-zinc-50 dark:bg-zinc-800/50 rounded-2xl cursor-pointer hover:border-indigo-500 border border-transparent transition-all group"
                       >
                         <div className="text-sm font-bold text-indigo-600 bg-white dark:bg-zinc-900 px-3 py-1 rounded-xl border border-zinc-200 dark:border-zinc-700">
-                          {new Date(t.dueDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          {getTaskScheduleLabel(t)}
                         </div>
                         <div className="flex-1">
                           <div className="text-sm font-medium text-zinc-700 dark:text-zinc-200 group-hover:text-indigo-600 transition-colors">
@@ -258,7 +377,9 @@ const RoutineView: React.FC<RoutineViewProps> = ({ tasks, onAdd, onUpdate, onDel
               {Array.from({ length: 7 }).map((_, i) => {
                 const d = new Date(currentDate);
                 d.setDate(currentDate.getDate() - currentDate.getDay() + i);
-                const dayTasks = tasks.filter(t => new Date(t.dueDate).toDateString() === d.toDateString());
+                const dayTasks = tasks
+                  .filter(t => taskOccursOnDate(t, d))
+                  .sort((a, b) => getTaskOccurrenceDateTime(a, d).getTime() - getTaskOccurrenceDateTime(b, d).getTime());
                 const isToday = d.toDateString() === new Date().toDateString();
                 return (
                   <div key={i} className={`flex-1 min-w-[140px] rounded-2xl p-3 flex flex-col gap-3 border ${isToday ? 'bg-indigo-50 dark:bg-indigo-900/20 border-indigo-200 dark:border-indigo-800' : 'bg-zinc-50 dark:bg-zinc-800/20 border-zinc-100 dark:border-zinc-800/50'}`}>
@@ -284,7 +405,7 @@ const RoutineView: React.FC<RoutineViewProps> = ({ tasks, onAdd, onUpdate, onDel
                               {t.title}
                             </div>
                             <div className="text-xs text-zinc-500 mt-1">
-                              {new Date(t.dueDate).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                              {getTaskScheduleLabel(t)}
                             </div>
                             {t.responsible && (
                               <div className="text-xs text-zinc-400 mt-1">👤 {t.responsible}</div>
@@ -514,6 +635,11 @@ const RoutineView: React.FC<RoutineViewProps> = ({ tasks, onAdd, onUpdate, onDel
                         {task.priority === 'high' ? 'Alta' : 'Baixa'} prioridade
                       </div>
                     )}
+                    {task.alarmConfig?.recurring && (
+                      <div className="mt-2 inline-flex items-center gap-1 px-2 py-1 rounded-full text-[10px] font-semibold bg-indigo-100 text-indigo-700 dark:bg-indigo-900/20 dark:text-indigo-300">
+                        <Repeat size={11} /> Recorrente
+                      </div>
+                    )}
                   </div>
                 ))}
                 {tasks.filter(t => t.status === stage.id).length === 0 && (
@@ -533,8 +659,8 @@ const RoutineView: React.FC<RoutineViewProps> = ({ tasks, onAdd, onUpdate, onDel
 
       {/* Formulário Ultra-Slim Modal (Now Theme Aware) */}
       {isAdding && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[150] flex items-center justify-center p-4">
-          <div className="bg-white dark:bg-zinc-900 w-full max-w-sm rounded-3xl shadow-2xl border border-zinc-200 dark:border-zinc-800 flex flex-col max-h-[90vh] overflow-hidden animate-in zoom-in-95 duration-200">
+        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[150] flex items-end sm:items-center justify-center p-0 sm:p-4">
+          <div className="bg-white dark:bg-zinc-900 w-full max-w-sm rounded-t-3xl sm:rounded-3xl shadow-2xl border border-zinc-200 dark:border-zinc-800 flex flex-col max-h-[92vh] sm:max-h-[90vh] overflow-hidden animate-in zoom-in-95 duration-200">
 
             <div className="px-6 py-4 border-b border-zinc-100 dark:border-zinc-800 flex justify-between items-center bg-white dark:bg-zinc-900 shrink-0">
               <h3 className="font-semibold text-sm text-zinc-900 dark:text-zinc-100">{editingTask ? 'Editar Tarefa' : 'Nova Tarefa'}</h3>
@@ -570,10 +696,39 @@ const RoutineView: React.FC<RoutineViewProps> = ({ tasks, onAdd, onUpdate, onDel
                 </div>
               </div>
 
-              <div className="grid grid-cols-2 gap-4">
+              <div className="bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-100 dark:border-zinc-800 p-4 rounded-2xl flex items-center justify-between">
+                <div className="flex items-center gap-3 text-zinc-500">
+                  <Repeat size={18} className={isRecurring ? 'text-indigo-500' : 'text-zinc-400'} />
+                  <span className="text-xs font-medium">Tarefa Recorrente</span>
+                </div>
+                <button type="button" onClick={() => setIsRecurring(!isRecurring)} className={`w-11 h-6 rounded-full relative transition-all ${isRecurring ? 'bg-indigo-600' : 'bg-zinc-300 dark:bg-zinc-600'}`}>
+                  <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all shadow-sm ${isRecurring ? 'right-1' : 'left-1'}`}></div>
+                </button>
+              </div>
+
+              {isRecurring && (
+                <div className="space-y-2">
+                  <label className="text-xs font-medium text-zinc-500">Dias da semana</label>
+                  <div className="grid grid-cols-4 sm:grid-cols-7 gap-2">
+                    {weekDays.map(day => (
+                      <button
+                        key={day.value}
+                        type="button"
+                        onClick={() => toggleRecurringDay(day.value)}
+                        className={`py-2 rounded-lg text-xs font-medium border transition-all ${recurringDays.includes(day.value) ? 'bg-indigo-600 border-indigo-600 text-white' : 'bg-zinc-50 dark:bg-zinc-800 border-zinc-200 dark:border-zinc-700 text-zinc-500 dark:text-zinc-400'}`}
+                      >
+                        {day.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
                 <div className="space-y-1.5">
-                  <label className="text-xs font-medium text-zinc-500">Prazo</label>
-                  <input type="datetime-local" value={date} onChange={e => setDate(e.target.value)} className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl px-3 py-3 outline-none text-xs font-medium text-zinc-900 dark:text-zinc-100" required />
+                  <label className="text-xs font-medium text-zinc-500">Data limite (obrigatório)</label>
+                  <input type="date" value={dueDateOnly} onChange={e => setDueDateOnly(e.target.value)} className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl px-3 py-3 outline-none text-xs font-medium text-zinc-900 dark:text-zinc-100" required />
+                  <p className="text-[11px] text-zinc-400">Sem horário, a tarefa vale para o dia todo.</p>
                 </div>
                 <div className="space-y-1.5">
                   <label className="text-xs font-medium text-zinc-500">Responsável</label>
@@ -583,13 +738,72 @@ const RoutineView: React.FC<RoutineViewProps> = ({ tasks, onAdd, onUpdate, onDel
 
               <div className="bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-100 dark:border-zinc-800 p-4 rounded-2xl flex items-center justify-between">
                 <div className="flex items-center gap-3 text-zinc-500">
-                  <BellRing size={18} className={alarmEnabled ? 'text-indigo-500' : 'text-zinc-400'} />
-                  <span className="text-xs font-medium">Notificar no horário</span>
+                  <Clock size={18} className={hasTimeWindow ? 'text-indigo-500' : 'text-zinc-400'} />
+                  <span className="text-xs font-medium">Adicionar horário (opcional)</span>
                 </div>
-                <button type="button" onClick={() => setAlarmEnabled(!alarmEnabled)} className={`w-11 h-6 rounded-full relative transition-all ${alarmEnabled ? 'bg-indigo-600' : 'bg-zinc-300 dark:bg-zinc-600'}`}>
+                <button type="button" onClick={() => {
+                  const next = !hasTimeWindow;
+                  setHasTimeWindow(next);
+                  if (!next) {
+                    setStartTime('');
+                    setEndTime('');
+                    setAlarmEnabled(false);
+                  }
+                }} className={`w-11 h-6 rounded-full relative transition-all ${hasTimeWindow ? 'bg-indigo-600' : 'bg-zinc-300 dark:bg-zinc-600'}`}>
+                  <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all shadow-sm ${hasTimeWindow ? 'right-1' : 'left-1'}`}></div>
+                </button>
+              </div>
+
+              {hasTimeWindow && (
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-zinc-500">Início</label>
+                    <input type="time" value={startTime} onChange={e => setStartTime(e.target.value)} className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl px-3 py-3 outline-none text-xs font-medium text-zinc-900 dark:text-zinc-100" />
+                  </div>
+                  <div className="space-y-1.5">
+                    <label className="text-xs font-medium text-zinc-500">Fim</label>
+                    <input type="time" value={endTime} onChange={e => setEndTime(e.target.value)} className="w-full bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-xl px-3 py-3 outline-none text-xs font-medium text-zinc-900 dark:text-zinc-100" />
+                  </div>
+                </div>
+              )}
+
+              <div className="bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-100 dark:border-zinc-800 p-4 rounded-2xl flex items-center justify-between">
+                <div className="flex items-center gap-3 text-zinc-500">
+                  <BellRing size={18} className={alarmEnabled ? 'text-indigo-500' : 'text-zinc-400'} />
+                  <span className="text-xs font-medium">Notificar no horário definido</span>
+                </div>
+                <button type="button" onClick={() => {
+                  const next = !alarmEnabled;
+                  setAlarmEnabled(next);
+                  if (next) setHasTimeWindow(true);
+                }} className={`w-11 h-6 rounded-full relative transition-all ${alarmEnabled ? 'bg-indigo-600' : 'bg-zinc-300 dark:bg-zinc-600'}`}>
                   <div className={`absolute top-1 w-4 h-4 bg-white rounded-full transition-all shadow-sm ${alarmEnabled ? 'right-1' : 'left-1'}`}></div>
                 </button>
               </div>
+
+              {missingNotificationSchedule && (
+                <div className="rounded-xl border border-rose-200 dark:border-rose-900/40 bg-rose-50 dark:bg-rose-900/10 px-3 py-2 flex items-center gap-2 text-rose-600 dark:text-rose-300 text-xs font-medium">
+                  <AlertCircle size={14} /> Para notificar, preencha horário de início e fim.
+                </div>
+              )}
+
+              {!missingNotificationSchedule && missingTimeWindowValues && (
+                <div className="rounded-xl border border-rose-200 dark:border-rose-900/40 bg-rose-50 dark:bg-rose-900/10 px-3 py-2 flex items-center gap-2 text-rose-600 dark:text-rose-300 text-xs font-medium">
+                  <AlertCircle size={14} /> Defina horário de início e fim da tarefa.
+                </div>
+              )}
+
+              {!missingNotificationSchedule && !missingTimeWindowValues && invalidTimeWindow && (
+                <div className="rounded-xl border border-rose-200 dark:border-rose-900/40 bg-rose-50 dark:bg-rose-900/10 px-3 py-2 flex items-center gap-2 text-rose-600 dark:text-rose-300 text-xs font-medium">
+                  <AlertCircle size={14} /> O horário de fim deve ser maior que o início.
+                </div>
+              )}
+
+              {!missingNotificationSchedule && !missingTimeWindowValues && !invalidTimeWindow && missingRecurringDays && (
+                <div className="rounded-xl border border-rose-200 dark:border-rose-900/40 bg-rose-50 dark:bg-rose-900/10 px-3 py-2 flex items-center gap-2 text-rose-600 dark:text-rose-300 text-xs font-medium">
+                  <AlertCircle size={14} /> Selecione ao menos um dia da semana.
+                </div>
+              )}
 
               {editingTask && (
                 <button
@@ -603,7 +817,7 @@ const RoutineView: React.FC<RoutineViewProps> = ({ tasks, onAdd, onUpdate, onDel
             </div>
 
             <div className="px-6 py-4 bg-white dark:bg-zinc-900 border-t border-zinc-100 dark:border-zinc-800 shrink-0">
-              <button onClick={handleSubmit} type="button" className="w-full bg-indigo-600 hover:bg-indigo-700 text-white py-3.5 rounded-xl font-semibold text-sm transition-all active:scale-95 shadow-sm flex items-center justify-center gap-2">
+              <button onClick={handleSubmit} disabled={isSubmitDisabled} type="button" className={`w-full py-3.5 rounded-xl font-semibold text-sm transition-all shadow-sm flex items-center justify-center gap-2 ${isSubmitDisabled ? 'bg-zinc-300 dark:bg-zinc-700 text-zinc-500 cursor-not-allowed' : 'bg-indigo-600 hover:bg-indigo-700 text-white active:scale-95'}`}>
                 <Check size={18} /> {editingTask ? 'Salvar Alterações' : 'Criar Tarefa'}
               </button>
             </div>

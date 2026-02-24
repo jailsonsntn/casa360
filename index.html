@@ -1,96 +1,208 @@
 <!DOCTYPE html>
-<html lang="pt-BR" class="h-full">
-
+<html lang="pt-BR">
 <head>
   <meta charset="UTF-8" />
-  <meta name="viewport" content="yes, width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no" />
-  <meta name="mobile-web-app-capable" content="yes">
-  <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-  <meta name="theme-color" content="#4f46e5">
-  <title>Casa360 - Gestão Residencial</title>
-  <link rel="icon" type="image/png" href="https://cdn-icons-png.flaticon.com/512/619/619153.png">
-  <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/619/619153.png">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#0f766e" />
+  <title>Casa360 | Organização da casa em família</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap"
-    rel="stylesheet">
-  <script>
-    tailwind.config = {
-      darkMode: 'class',
-      theme: {
-        extend: {
-          fontFamily: {
-            sans: ['Inter', 'sans-serif'],
-          },
-          animation: {
-            'fade-in': 'fadeIn 0.5s ease-in-out',
-            'slide-in': 'slideIn 0.3s ease-out',
-          },
-          keyframes: {
-            fadeIn: {
-              '0%': { opacity: '0' },
-              '100%': { opacity: '1' },
-            },
-            slideIn: {
-              '0%': { transform: 'translateY(-10px)', opacity: '0' },
-              '100%': { transform: 'translateY(0)', opacity: '1' },
-            },
-          },
-        },
-      },
-    }
-  </script>
+  <link rel="preconnect" href="https://fonts.googleapis.com" />
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800;900&display=swap" rel="stylesheet" />
   <style>
-    body {
-      transition: background-color 0.3s ease;
-    }
-
+    body { font-family: 'Inter', sans-serif; }
     .no-scrollbar::-webkit-scrollbar {
       display: none;
     }
-
     .no-scrollbar {
       -ms-overflow-style: none;
       scrollbar-width: none;
     }
-
-    .animate-fade-in {
-      animation: fadeIn 0.5s ease-in-out;
+    .shape-hero {
+      clip-path: ellipse(78% 100% at 50% 0%);
     }
-
-    .animate-slide-in {
-      animation: slideIn 0.3s ease-out;
+    .shape-section-top {
+      clip-path: ellipse(105% 100% at 50% 100%);
     }
-
-    @keyframes fadeIn {
-      0% { opacity: 0; }
-      100% { opacity: 1; }
-    }
-
-    @keyframes slideIn {
-      0% { transform: translateY(-10px); opacity: 0; }
-      100% { transform: translateY(0); opacity: 1; }
+    .shape-section-bottom {
+      clip-path: ellipse(110% 100% at 50% 0%);
     }
   </style>
-  <script type="importmap">
-{
-  "imports": {
-    "react": "https://esm.sh/react@19.0.0",
-    "react-dom": "https://esm.sh/react-dom@19.0.0",
-    "react-dom/client": "https://esm.sh/react-dom@19.0.0/client",
-    "recharts": "https://esm.sh/recharts@2.15.0?external=react,react-dom",
-    "lucide-react": "https://esm.sh/lucide-react@0.475.0?external=react",
-    "@google/genai": "https://esm.sh/@google/genai@1.34.0",
-    "@supabase/supabase-js": "https://esm.sh/@supabase/supabase-js@2.48.1",
-    "react-dom/": "https://esm.sh/react-dom@^19.2.3/",
-    "react/": "https://esm.sh/react@^19.2.3/"
-  }
-}
-</script>
 </head>
+<body class="bg-stone-50 text-slate-800">
+  <header class="fixed top-0 inset-x-0 z-50 bg-white/95 border-b border-stone-200 backdrop-blur">
+    <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8">
+      <div class="h-16 flex items-center justify-between">
+        <a href="#home" class="text-slate-900 text-lg font-bold tracking-wide">CASA360</a>
+        <nav class="hidden md:flex items-center gap-6 text-sm text-slate-600">
+          <a href="#about" class="hover:text-teal-700">Sobre</a>
+          <a href="#services" class="hover:text-teal-700">Serviços</a>
+          <a href="/blog.html" class="hover:text-teal-700">Blog</a>
+          <a href="#contact" class="hover:text-teal-700">Contato</a>
+        </nav>
+        <a href="/app.html" class="rounded-full border border-teal-600 px-3 sm:px-4 py-2 text-[11px] sm:text-xs font-semibold uppercase tracking-wider text-teal-700 hover:bg-teal-600 hover:text-white transition-colors">Entrar</a>
+      </div>
+      <div class="md:hidden pb-3 -mt-1">
+        <nav class="flex items-center gap-4 overflow-x-auto whitespace-nowrap text-xs font-medium text-slate-600 no-scrollbar">
+          <a href="#about" class="hover:text-teal-700">Sobre</a>
+          <a href="#services" class="hover:text-teal-700">Serviços</a>
+          <a href="/blog.html" class="hover:text-teal-700">Blog</a>
+          <a href="#contact" class="hover:text-teal-700">Contato</a>
+        </nav>
+      </div>
+    </div>
+  </header>
 
-<body class="bg-slate-50 dark:bg-slate-950 select-none h-full">
-  <div id="root" class="h-full"></div>
-  <script type="module" src="/index.tsx"></script>
+  <main id="home" class="pt-24 md:pt-16">
+    <section class="relative overflow-hidden bg-slate-900">
+      <div class="absolute inset-0 bg-gradient-to-r from-slate-900 via-slate-800/60 to-slate-900/20"></div>
+      <img src="https://images.unsplash.com/photo-1511895426328-dc8714191300?auto=format&fit=crop&w=1600&q=80" alt="Família organizada em casa" class="h-[520px] sm:h-[560px] w-full object-cover opacity-70" />
+      <div class="absolute inset-0 flex items-center">
+        <div class="mx-auto w-full max-w-7xl px-4 sm:px-6 lg:px-8">
+          <div class="max-w-2xl text-white">
+            <p class="mb-3 text-xs sm:text-sm font-semibold uppercase tracking-[0.2em] sm:tracking-[0.24em] text-teal-200">Casa360 para famílias</p>
+            <h1 class="text-3xl sm:text-5xl font-extrabold leading-tight">Sua casa mais organizada, leve e previsível</h1>
+            <p class="mt-4 sm:mt-5 text-slate-200 text-base sm:text-lg">Reúna finanças, tarefas, saúde e compras em um só lugar para facilitar o dia a dia de todos da família.</p>
+            <div class="mt-7 sm:mt-8 grid grid-cols-1 sm:flex sm:flex-wrap gap-3 max-w-xs sm:max-w-none">
+              <a href="/app.html" class="text-center rounded-full bg-teal-600 px-6 py-3 text-sm font-semibold uppercase tracking-wider text-white hover:bg-teal-500">Entrar na plataforma</a>
+              <a href="#services" class="text-center rounded-full border border-white/40 px-6 py-3 text-sm font-semibold uppercase tracking-wider text-white hover:bg-white/10">Ver serviços</a>
+            </div>
+          </div>
+        </div>
+      </div>
+      <div class="absolute -bottom-1 left-0 w-full h-24 bg-stone-50 shape-hero"></div>
+    </section>
+
+    <section id="about" class="relative -mt-4 px-4 sm:px-6 lg:px-8 pb-12 sm:pb-16">
+      <div class="mx-auto max-w-7xl">
+        <div class="grid gap-6 lg:grid-cols-12">
+          <article class="lg:col-span-8 rounded-3xl bg-white border border-slate-200 p-6 sm:p-8 shadow-sm">
+            <p class="text-xs font-semibold uppercase tracking-[0.2em] text-teal-700">Sobre o Casa360</p>
+            <h2 class="mt-3 text-2xl sm:text-3xl font-bold text-slate-900">Um jeito simples de cuidar da rotina da casa</h2>
+            <p class="mt-4 text-slate-600">O Casa360 ajuda sua família a manter tudo em ordem com uma visão clara do que precisa ser feito, sem planilhas espalhadas e sem confusão.</p>
+            <div class="mt-6 grid sm:grid-cols-3 gap-4">
+              <div class="rounded-2xl bg-slate-50 p-4 border border-slate-200">
+                <p class="text-xs uppercase tracking-wider text-slate-500">Áreas em um só lugar</p>
+                <p class="text-2xl font-extrabold text-slate-900 mt-1">6</p>
+              </div>
+              <div class="rounded-2xl bg-slate-50 p-4 border border-slate-200">
+                <p class="text-xs uppercase tracking-wider text-slate-500">Acesso rápido</p>
+                <p class="text-2xl font-extrabold text-slate-900 mt-1">24/7</p>
+              </div>
+              <div class="rounded-2xl bg-slate-50 p-4 border border-slate-200">
+                <p class="text-xs uppercase tracking-wider text-slate-500">Rotina mais leve</p>
+                <p class="text-2xl font-extrabold text-slate-900 mt-1">Todo dia</p>
+              </div>
+            </div>
+          </article>
+          <aside class="lg:col-span-4 rounded-3xl bg-teal-700 text-white p-6 sm:p-8 shadow-sm">
+            <p class="text-xs font-semibold uppercase tracking-[0.2em] text-teal-100">Destaque</p>
+            <h3 class="mt-3 text-2xl font-bold">Painel da família</h3>
+            <ul class="mt-5 space-y-3 text-sm text-slate-300">
+              <li>• Finanças da casa organizadas</li>
+              <li>• Tarefas e responsabilidades claras</li>
+              <li>• Alertas de saúde e medicamentos</li>
+              <li>• Compras compartilhadas e práticas</li>
+            </ul>
+            <a href="/app.html" class="mt-6 inline-flex rounded-full bg-white px-5 py-2 text-xs font-semibold uppercase tracking-wider text-teal-700 hover:bg-teal-50">Acessar painel</a>
+          </aside>
+        </div>
+      </div>
+    </section>
+
+    <section id="services" class="relative bg-white py-12 sm:py-16 px-4 sm:px-6 lg:px-8 overflow-hidden border-y border-slate-200">
+      <div class="absolute top-0 left-0 w-full h-20 bg-stone-50 shape-section-top"></div>
+      <div class="mx-auto max-w-7xl relative z-10">
+        <div class="text-center mb-10">
+          <p class="text-xs font-semibold uppercase tracking-[0.2em] text-teal-700">Serviços</p>
+          <h2 class="mt-2 text-2xl sm:text-3xl font-bold text-slate-900">Tudo que sua família precisa no dia a dia</h2>
+        </div>
+        <div class="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+          <article class="rounded-2xl border border-slate-200 p-6">
+            <h3 class="font-semibold text-slate-900">Finanças da casa</h3>
+            <p class="mt-2 text-sm text-slate-600">Acompanhe receitas, despesas e contas em um fluxo simples.</p>
+          </article>
+          <article class="rounded-2xl border border-slate-200 p-6">
+            <h3 class="font-semibold text-slate-900">Rotina e tarefas</h3>
+            <p class="mt-2 text-sm text-slate-600">Distribua tarefas e acompanhe o que já foi concluído.</p>
+          </article>
+          <article class="rounded-2xl border border-slate-200 p-6">
+            <h3 class="font-semibold text-slate-900">Saúde em dia</h3>
+            <p class="mt-2 text-sm text-slate-600">Gerencie horários de medicamentos e lembretes importantes.</p>
+          </article>
+          <article class="rounded-2xl border border-slate-200 p-6">
+            <h3 class="font-semibold text-slate-900">Compras da semana</h3>
+            <p class="mt-2 text-sm text-slate-600">Monte listas compartilhadas e marque o que já foi comprado.</p>
+          </article>
+          <article class="rounded-2xl border border-slate-200 p-6">
+            <h3 class="font-semibold text-slate-900">Perfis da família</h3>
+            <p class="mt-2 text-sm text-slate-600">Personalize preferências e alertas para cada pessoa da casa.</p>
+          </article>
+          <article class="rounded-2xl border border-slate-200 p-6">
+            <h3 class="font-semibold text-slate-900">Resumo diário</h3>
+            <p class="mt-2 text-sm text-slate-600">Veja rapidamente o que importa para começar bem o dia.</p>
+          </article>
+        </div>
+      </div>
+      <div class="absolute -bottom-1 left-0 w-full h-20 bg-stone-50 shape-section-bottom"></div>
+    </section>
+
+    <section id="blog" class="bg-slate-900 py-12 sm:py-16 px-4 sm:px-6 lg:px-8 text-white">
+      <div class="mx-auto max-w-7xl">
+        <div class="mb-8 flex flex-col sm:flex-row sm:items-end sm:justify-between gap-4">
+          <div>
+          <p class="text-xs font-semibold uppercase tracking-[0.2em] text-teal-200">Blog da Casa360</p>
+          <h2 class="mt-2 text-2xl sm:text-3xl font-bold">Dicas para uma rotina em família mais tranquila</h2>
+          </div>
+          <a href="/blog.html" class="text-sm font-semibold text-teal-200 hover:text-white">Ver todos os artigos</a>
+        </div>
+        <div class="grid gap-5 md:grid-cols-3">
+          <article class="rounded-2xl overflow-hidden border border-slate-700 bg-slate-800">
+            <img src="https://images.unsplash.com/photo-1454165804606-c3d57bc86b40?auto=format&fit=crop&w=800&q=80" alt="Planejamento financeiro" class="h-44 w-full object-cover" />
+            <div class="p-5">
+              <h3 class="font-semibold"><a href="/blog/planejamento-financeiro-familiar.html" class="hover:text-teal-200">Planejamento financeiro da casa em 5 passos</a></h3>
+              <p class="mt-2 text-sm text-slate-300">Um guia simples para equilibrar entradas e saídas sem dor de cabeça.</p>
+            </div>
+          </article>
+          <article class="rounded-2xl overflow-hidden border border-slate-700 bg-slate-800">
+            <img src="https://images.unsplash.com/photo-1517048676732-d65bc937f952?auto=format&fit=crop&w=800&q=80" alt="Rotina doméstica" class="h-44 w-full object-cover" />
+            <div class="p-5">
+              <h3 class="font-semibold"><a href="/blog/rotina-familiar-organizada.html" class="hover:text-teal-200">Como dividir tarefas sem sobrecarregar ninguém</a></h3>
+              <p class="mt-2 text-sm text-slate-300">Estratégias para manter a casa organizada com participação de todos.</p>
+            </div>
+          </article>
+          <article class="rounded-2xl overflow-hidden border border-slate-700 bg-slate-800">
+            <img src="https://images.unsplash.com/photo-1576091160550-2173dba999ef?auto=format&fit=crop&w=800&q=80" alt="Governança de saúde" class="h-44 w-full object-cover" />
+            <div class="p-5">
+              <h3 class="font-semibold"><a href="/blog/lista-compras-inteligente-familia.html" class="hover:text-teal-200">Lista de compras inteligente para família</a></h3>
+              <p class="mt-2 text-sm text-slate-300">Aprenda a montar listas por categoria e reduzir desperdícios no supermercado.</p>
+            </div>
+          </article>
+        </div>
+      </div>
+    </section>
+
+    <section id="contact" class="py-12 sm:py-16 px-4 sm:px-6 lg:px-8">
+      <div class="mx-auto max-w-5xl rounded-3xl bg-gradient-to-r from-teal-600 to-cyan-700 p-6 sm:p-10 text-white">
+        <h2 class="text-2xl sm:text-3xl font-bold">Que tal deixar a rotina da casa mais simples?</h2>
+        <p class="mt-3 text-teal-50 max-w-2xl">Entre no Casa360 e organize tarefas, finanças, saúde e compras com mais tranquilidade para toda a família.</p>
+        <div class="mt-7">
+          <a href="/app.html" class="inline-flex rounded-full bg-white px-6 py-3 text-sm font-semibold uppercase tracking-wider text-teal-700 hover:bg-teal-50">Entrar na plataforma</a>
+        </div>
+      </div>
+    </section>
+  </main>
+
+  <footer class="bg-white border-t border-slate-200">
+    <div class="mx-auto max-w-7xl px-4 sm:px-6 lg:px-8 py-7 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between text-sm text-slate-500">
+      <p>© 2026 Casa360. Todos os direitos reservados.</p>
+      <div class="flex gap-4">
+        <a href="#about" class="hover:text-teal-700">Sobre</a>
+        <a href="#services" class="hover:text-teal-700">Serviços</a>
+        <a href="/app.html" class="hover:text-teal-700">Entrar</a>
+      </div>
+    </div>
+  </footer>
+
 </body>
-
 </html>

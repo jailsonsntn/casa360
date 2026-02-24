@@ -1,36 +1,90 @@
 
 import { AlarmSoundType, VibrationIntensity } from '../types';
 
+type NotificationPermissionState = NotificationPermission | 'unsupported';
+
+interface PlatformInfo {
+  isBrowser: boolean;
+  isSecureContext: boolean;
+  isNativeLike: boolean;
+  supportsNotificationApi: boolean;
+  supportsServiceWorker: boolean;
+  supportsVibration: boolean;
+  supportsAudioContext: boolean;
+}
+
+const getPlatformInfo = (): PlatformInfo => {
+  const hasWindow = typeof window !== 'undefined';
+  const nativeLike = hasWindow && !!((window as any).Capacitor?.isNativePlatform?.() || (window as any).cordova);
+  return {
+    isBrowser: hasWindow,
+    isSecureContext: hasWindow ? window.isSecureContext : false,
+    isNativeLike: nativeLike,
+    supportsNotificationApi: hasWindow && 'Notification' in window,
+    supportsServiceWorker: hasWindow && 'serviceWorker' in navigator,
+    supportsVibration: hasWindow && 'vibrate' in navigator,
+    supportsAudioContext: hasWindow && !!(window.AudioContext || (window as any).webkitAudioContext)
+  };
+};
+
+const getPermissionStatus = (): NotificationPermissionState => {
+  const platform = getPlatformInfo();
+  if (!platform.supportsNotificationApi) return 'unsupported';
+  return Notification.permission;
+};
+
 export const notificationService = {
+  getPlatformInfo,
+  getPermissionStatus,
+
   requestPermission: async () => {
-    if (!('Notification' in window)) return false;
+    const platform = getPlatformInfo();
+    if (!platform.supportsNotificationApi || !platform.isBrowser) return false;
+    if (Notification.permission === 'granted') return true;
+    if (Notification.permission === 'denied') return false;
     const permission = await Notification.requestPermission();
     return permission === 'granted';
   },
 
+  ensureNotificationPermission: async () => {
+    const status = getPermissionStatus();
+    if (status === 'granted') return true;
+    if (status === 'denied' || status === 'unsupported') return false;
+    return notificationService.requestPermission();
+  },
+
   sendLocalNotification: (title: string, body: string, urgent: boolean = false) => {
-    if (Notification.permission === 'granted') {
-      try {
-        const n = new Notification(title, {
-          body: body,
-          icon: 'https://cdn-icons-png.flaticon.com/512/619/619153.png',
-          tag: urgent ? 'urgent-alarm' : 'standard-reminder',
-          renotify: urgent,
-          requireInteraction: urgent,
-          vibrate: urgent ? [500, 110, 500, 110, 450, 110, 200, 110, 170, 40, 450, 110, 200, 110, 170, 40, 500] : [200, 100, 200]
-        } as any);
-        
-        n.onclick = () => {
-          window.focus();
-          n.close();
-        };
-      } catch (e) {
-        console.warn("Push notification failed, falling back to basic alert.");
-      }
+    const platform = getPlatformInfo();
+    if (!platform.supportsNotificationApi || Notification.permission !== 'granted') return false;
+    try {
+      const n = new Notification(title, {
+        body: body,
+        icon: 'https://cdn-icons-png.flaticon.com/512/619/619153.png',
+        tag: urgent ? 'urgent-alarm' : 'standard-reminder',
+        renotify: urgent,
+        requireInteraction: urgent,
+        vibrate: urgent ? [500, 110, 500, 110, 450, 110, 200, 110, 170, 40, 450, 110, 200, 110, 170, 40, 500] : [200, 100, 200]
+      } as any);
+      
+      n.onclick = () => {
+        window.focus();
+        n.close();
+      };
+      return true;
+    } catch (e) {
+      console.warn("Push notification failed, falling back to basic alert.");
+      return false;
     }
   },
 
+  canUseBackgroundNotifications: () => {
+    const platform = getPlatformInfo();
+    return platform.supportsServiceWorker && platform.supportsNotificationApi;
+  },
+
   playAlarmSound: (type: AlarmSoundType = 'standard') => {
+    const platform = getPlatformInfo();
+    if (!platform.supportsAudioContext) return false;
     try {
       const audioCtx = new (window.AudioContext || (window as any).webkitAudioContext)();
       const oscillator = audioCtx.createOscillator();
@@ -68,22 +122,57 @@ export const notificationService = {
         oscillator.start(now);
         oscillator.stop(now + 1.5);
       }
+      return true;
     } catch (e) {
       console.error("Audio Context Error", e);
+      return false;
     }
   },
 
   vibrate: (type: 'short' | 'long' | 'urgent' | VibrationIntensity = 'short') => {
-    if ('vibrate' in navigator) {
-      const patterns: Record<string, number[]> = {
-        short: [100],
-        long: [500, 200, 500],
-        urgent: [500, 100, 500, 100, 500],
-        low: [50],
-        medium: [200, 100, 200],
-        high: [400, 100, 400, 100, 400]
-      };
-      navigator.vibrate(patterns[type] || patterns.short);
+    const platform = getPlatformInfo();
+    if (!platform.supportsVibration) return false;
+    const patterns: Record<string, number[]> = {
+      short: [100],
+      long: [500, 200, 500],
+      urgent: [500, 100, 500, 100, 500],
+      low: [50],
+      medium: [200, 100, 200],
+      high: [400, 100, 400, 100, 400]
+    };
+    navigator.vibrate(patterns[type] || patterns.short);
+    return true;
+  },
+
+  triggerAlarmFeedback: (params: {
+    title: string;
+    body: string;
+    urgent?: boolean;
+    soundEnabled?: boolean;
+    soundType?: AlarmSoundType;
+    vibrationEnabled?: boolean;
+    vibrationType?: 'short' | 'long' | 'urgent' | VibrationIntensity;
+    notificationsEnabled?: boolean;
+  }) => {
+    const {
+      title,
+      body,
+      urgent = false,
+      soundEnabled = true,
+      soundType = 'standard',
+      vibrationEnabled = true,
+      vibrationType = 'short',
+      notificationsEnabled = true
+    } = params;
+
+    if (soundEnabled) notificationService.playAlarmSound(soundType);
+    if (vibrationEnabled) notificationService.vibrate(vibrationType);
+    if (notificationsEnabled && getPermissionStatus() === 'granted') {
+      try {
+        notificationService.sendLocalNotification(title, body, urgent);
+      } catch (e) {
+        console.warn('Falha ao enviar notificação local', e);
+      }
     }
   }
 };
