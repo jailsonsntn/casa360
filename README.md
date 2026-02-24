@@ -70,6 +70,12 @@ O deploy oficial está disponível em:
 3.  **Configure as variáveis de ambiente**:
     Crie um arquivo `.env` com suas chaves do Supabase:
     ```env
+    VITE_SUPABASE_URL=sua_url
+    VITE_SUPABASE_ANON_KEY=sua_chave
+    ```
+
+    Também aceitamos o padrão legado:
+    ```env
     SUPABASE_URL=sua_url
     SUPABASE_ANON_KEY=sua_chave
     ```
