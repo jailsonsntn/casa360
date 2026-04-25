@@ -42,19 +42,19 @@ interface FinanceViewProps {
 
 const PAYMENT_METHODS: { id: PaymentMethod; label: string }[] = [
   { id: 'pix', label: 'Pix' },
-  { id: 'credit_card', label: 'Credito' },
-  { id: 'debit_card', label: 'Debito' },
+  { id: 'credit_card', label: 'Crédito' },
+  { id: 'debit_card', label: 'Débito' },
   { id: 'cash', label: 'Dinheiro' },
   { id: 'transfer', label: 'Transf.' },
 ];
 
 const CLASSIFICATIONS: { id: TransactionClassification; label: string }[] = [
   { id: 'fixed', label: 'Fixo' },
-  { id: 'variable', label: 'Variavel' },
+  { id: 'variable', label: 'Variável' },
   { id: 'recurring', label: 'Recorrente' },
 ];
 
-const MONTHS = ['Janeiro', 'Fevereiro', 'Marco', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+const MONTHS = ['Janeiro', 'Fevereiro', 'Março', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 const FinanceView: React.FC<FinanceViewProps> = ({
@@ -141,7 +141,7 @@ const FinanceView: React.FC<FinanceViewProps> = ({
         name: MONTHS[m].substring(0, 3),
         Receitas: income,
         Despesas: expense,
-        Cartoes: card,
+        Cartões: card,
       };
     });
   }, [transactions, selectedMonth, selectedYear]);
@@ -194,10 +194,10 @@ const FinanceView: React.FC<FinanceViewProps> = ({
   }, [persistedCreditCards, monthTransactions]);
 
   const getPaymentMethodLabel = (method: PaymentMethod) => {
-    if (method === 'credit_card') return 'Cartao de credito';
-    if (method === 'debit_card') return 'Cartao de debito';
+    if (method === 'credit_card') return 'Cartão de crédito';
+    if (method === 'debit_card') return 'Cartão de débito';
     if (method === 'cash') return 'Dinheiro';
-    if (method === 'transfer') return 'Transferencia';
+    if (method === 'transfer') return 'Transferência';
     return 'Pix';
   };
 
@@ -344,7 +344,7 @@ const FinanceView: React.FC<FinanceViewProps> = ({
       <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
           <h1 className="text-3xl font-bold text-slate-100">Dashboard</h1>
-          <p className="text-sm text-slate-400 mt-1">Visao geral das suas financas</p>
+          <p className="text-sm text-slate-400 mt-1">Visão geral das suas finanças</p>
         </div>
 
         <div className="flex items-center gap-3">
@@ -367,7 +367,7 @@ const FinanceView: React.FC<FinanceViewProps> = ({
             }}
             className="px-4 py-2 rounded-xl text-sm font-semibold text-white bg-gradient-to-r from-indigo-500 to-violet-500 hover:from-indigo-400 hover:to-violet-400"
           >
-            <Plus size={14} className="inline mr-1" /> Nova Transacao
+            <Plus size={14} className="inline mr-1" /> Nova Transação
           </button>
         </div>
       </div>
@@ -378,14 +378,14 @@ const FinanceView: React.FC<FinanceViewProps> = ({
           onClick={() => setViewMode('overview')}
           className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${viewMode === 'overview' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'}`}
         >
-          Visao Geral
+          Visão Geral
         </button>
         <button
           type="button"
           onClick={() => setViewMode('cards')}
           className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${viewMode === 'cards' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'}`}
         >
-          Por Cartao
+          Por Cartão
         </button>
       </div>
 
@@ -398,7 +398,7 @@ const FinanceView: React.FC<FinanceViewProps> = ({
           <p className={`text-4xl font-bold ${totalBalance >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
             R$ {Math.abs(totalBalance).toLocaleString('pt-BR')}
           </p>
-          <p className="text-xs text-slate-500 mt-2">Considera todo o historico</p>
+          <p className="text-xs text-slate-500 mt-2">Considera todo o histórico</p>
         </div>
 
         <div className="rounded-2xl border border-emerald-500/30 bg-slate-950/70 p-5">
@@ -416,12 +416,12 @@ const FinanceView: React.FC<FinanceViewProps> = ({
             <ArrowDownCircle size={16} className="text-rose-400" />
           </div>
           <p className="text-4xl font-bold text-rose-400">R$ {monthExpense.toLocaleString('pt-BR')}</p>
-          <p className="text-xs text-slate-500 mt-2">Manual: R$ {(monthExpense - monthCardExpense).toLocaleString('pt-BR')}  Cartao: R$ {monthCardExpense.toLocaleString('pt-BR')}</p>
+          <p className="text-xs text-slate-500 mt-2">Manual: R$ {(monthExpense - monthCardExpense).toLocaleString('pt-BR')}  Cartão: R$ {monthCardExpense.toLocaleString('pt-BR')}</p>
         </div>
 
         <div className="rounded-2xl border border-amber-500/30 bg-slate-950/70 p-5">
           <div className="flex items-center justify-between mb-4">
-            <p className="text-xs uppercase tracking-wider text-slate-400">Saldo do Mes</p>
+            <p className="text-xs uppercase tracking-wider text-slate-400">Saldo do Mês</p>
             <TrendingUp size={16} className="text-amber-400" />
           </div>
           <p className={`text-4xl font-bold ${monthBalance >= 0 ? 'text-emerald-400' : 'text-rose-400'}`}>
@@ -434,7 +434,7 @@ const FinanceView: React.FC<FinanceViewProps> = ({
       {viewMode === 'overview' && (
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
         <div className="xl:col-span-2 rounded-2xl border border-slate-700 bg-slate-950/70 p-5">
-          <h3 className="text-sm font-semibold text-slate-200 mb-4">Evolucao dos ultimos 6 meses</h3>
+          <h3 className="text-sm font-semibold text-slate-200 mb-4">Evolução dos últimos 6 meses</h3>
           <ResponsiveContainer width="100%" height={250}>
             <AreaChart data={trendData}>
               <defs>
@@ -458,7 +458,7 @@ const FinanceView: React.FC<FinanceViewProps> = ({
               <Legend />
               <Area type="monotone" dataKey="Receitas" stroke="#22c55e" fill="url(#inc)" strokeWidth={2} />
               <Area type="monotone" dataKey="Despesas" stroke="#f43f5e" fill="url(#exp)" strokeWidth={2} />
-              <Area type="monotone" dataKey="Cartoes" stroke="#6366f1" fill="url(#card)" strokeWidth={1.6} />
+              <Area type="monotone" dataKey="Cartões" stroke="#6366f1" fill="url(#card)" strokeWidth={1.6} />
             </AreaChart>
           </ResponsiveContainer>
         </div>
@@ -466,7 +466,7 @@ const FinanceView: React.FC<FinanceViewProps> = ({
         <div className="rounded-2xl border border-slate-700 bg-slate-950/70 p-5">
           <h3 className="text-sm font-semibold text-slate-200 mb-4">Gastos por categoria</h3>
           {pieData.length === 0 ? (
-            <div className="h-[250px] grid place-items-center text-slate-500 text-sm">Sem despesas neste mes</div>
+            <div className="h-[250px] grid place-items-center text-slate-500 text-sm">Sem despesas neste mês</div>
           ) : (
             <>
               <ResponsiveContainer width="100%" height={160}>
@@ -501,7 +501,7 @@ const FinanceView: React.FC<FinanceViewProps> = ({
         <div className="space-y-4">
           <div className="rounded-2xl border border-indigo-500/30 bg-slate-950/70 p-5 flex items-center justify-between">
             <div>
-              <p className="text-xs uppercase tracking-wider text-slate-400">Total em cartoes neste mes</p>
+              <p className="text-xs uppercase tracking-wider text-slate-400">Total em cartões neste mês</p>
               <p className="text-4xl font-bold text-indigo-300 mt-2">R$ {monthCardExpense.toLocaleString('pt-BR')}</p>
               <p className="text-xs text-slate-500 mt-2">{MONTHS[selectedMonth]} {selectedYear}</p>
             </div>
@@ -510,7 +510,7 @@ const FinanceView: React.FC<FinanceViewProps> = ({
 
           {monthCardSummaries.length === 0 ? (
             <div className="rounded-2xl border border-slate-700 bg-slate-950/70 py-12 text-center text-slate-500 text-sm">
-              Nenhum cartao ativo para visualizar.
+              Nenhum cartão ativo para visualizar.
             </div>
           ) : (
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
@@ -525,7 +525,7 @@ const FinanceView: React.FC<FinanceViewProps> = ({
                   </div>
 
                   {launches.length === 0 ? (
-                    <p className="text-xs text-slate-500">Sem lancamentos neste mes.</p>
+                    <p className="text-xs text-slate-500">Sem lançamentos neste mês.</p>
                   ) : (
                     <div className="space-y-2 max-h-52 overflow-y-auto pr-1">
                       {launches.slice(0, 8).map(tx => (
@@ -538,7 +538,7 @@ const FinanceView: React.FC<FinanceViewProps> = ({
                         </div>
                       ))}
                       {launches.length > 8 && (
-                        <p className="text-[11px] text-slate-500 text-center pt-1">+ {launches.length - 8} lancamento(s)</p>
+                        <p className="text-[11px] text-slate-500 text-center pt-1">+ {launches.length - 8} lançamento(s)</p>
                       )}
                     </div>
                   )}
@@ -551,12 +551,12 @@ const FinanceView: React.FC<FinanceViewProps> = ({
 
       <div className="rounded-2xl border border-slate-700 bg-slate-950/70 overflow-hidden">
         <div className="px-5 py-4 border-b border-slate-800 flex items-center justify-between">
-          <h3 className="text-sm font-semibold text-slate-200">Lancamentos recentes</h3>
+          <h3 className="text-sm font-semibold text-slate-200">Lançamentos recentes</h3>
           <span className="text-xs text-slate-500">{recentTransactions.length} item(ns)</span>
         </div>
 
         {recentTransactions.length === 0 ? (
-          <div className="py-14 text-center text-slate-500 text-sm">Nenhuma transacao neste mes</div>
+          <div className="py-14 text-center text-slate-500 text-sm">Nenhuma transação neste mês</div>
         ) : (
           <div className="divide-y divide-slate-800">
             {recentTransactions.map(tx => (
@@ -598,7 +598,7 @@ const FinanceView: React.FC<FinanceViewProps> = ({
               <AlertTriangle size={24} />
             </div>
             <div className="space-y-2">
-              <h4 className="font-bold text-slate-100">Excluir lancamento?</h4>
+              <h4 className="font-bold text-slate-100">Excluir lançamento?</h4>
               <p className="text-sm text-slate-400">{itemToDelete.category} - R$ {itemToDelete.value.toLocaleString('pt-BR')}</p>
               {itemToDelete.isInstallment && itemToDelete.originalTransactionId && (
                 <label className="flex items-center justify-center gap-2 text-xs text-slate-300 mt-2">
@@ -608,7 +608,7 @@ const FinanceView: React.FC<FinanceViewProps> = ({
                     onChange={(e) => setDeleteSeriesMode(e.target.checked)}
                     className="accent-indigo-500"
                   />
-                  Excluir todas as parcelas da serie
+                  Excluir todas as parcelas da série
                 </label>
               )}
             </div>
@@ -641,7 +641,7 @@ const FinanceView: React.FC<FinanceViewProps> = ({
         <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[150] flex items-center justify-center p-2">
           <div className="bg-slate-950 w-full max-w-sm rounded-2xl shadow-2xl border border-slate-700 flex flex-col max-h-[95vh] overflow-hidden">
             <div className="px-4 py-3 border-b border-slate-800 flex justify-between items-center">
-              <h3 className="font-bold text-sm text-slate-100">{editingItem ? 'Editar' : 'Nova'} Transacao</h3>
+              <h3 className="font-bold text-sm text-slate-100">{editingItem ? 'Editar' : 'Nova'} Transação</h3>
               <button onClick={resetForm} className="p-1 text-slate-400 hover:text-slate-200 transition-colors rounded hover:bg-slate-800">
                 <X size={18} />
               </button>
@@ -650,7 +650,7 @@ const FinanceView: React.FC<FinanceViewProps> = ({
             <form onSubmit={handleSubmit} className="flex-1 overflow-y-auto p-4 space-y-3">
               <div className="p-0.5 bg-slate-900 rounded-lg flex gap-0.5">
                 <button type="button" onClick={() => setType('expense')} className={`flex-1 py-2 text-xs font-medium rounded-md transition-all ${type === 'expense' ? 'bg-slate-700 text-rose-300 shadow-sm' : 'text-slate-500'}`}>
-                  Saida
+                  Saída
                 </button>
                 <button type="button" onClick={() => setType('income')} className={`flex-1 py-2 text-xs font-medium rounded-md transition-all ${type === 'income' ? 'bg-slate-700 text-emerald-300 shadow-sm' : 'text-slate-500'}`}>
                   Entrada
@@ -658,7 +658,7 @@ const FinanceView: React.FC<FinanceViewProps> = ({
               </div>
 
               <div className="space-y-1">
-                <label className="text-xs font-medium text-slate-300">Descricao</label>
+                <label className="text-xs font-medium text-slate-300">Descrição</label>
                 <input type="text" value={category} onChange={e => setCategory(e.target.value)} className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 outline-none font-medium text-xs text-slate-100 focus:border-indigo-500" placeholder="Ex: Mercado" required />
               </div>
 
@@ -687,16 +687,16 @@ const FinanceView: React.FC<FinanceViewProps> = ({
               {paymentMethod === 'credit_card' && (
                 <>
                   <div className="space-y-1">
-                    <label className="text-xs font-medium text-slate-300">Cartao de Credito</label>
+                    <label className="text-xs font-medium text-slate-300">Cartão de Crédito</label>
                     <select value={selectedCreditCardId} onChange={e => setSelectedCreditCardId(e.target.value)} className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 outline-none font-medium text-xs text-slate-100 focus:border-indigo-500" required={paymentMethod === 'credit_card'}>
-                      <option value="">Selecione um cartao</option>
+                      <option value="">Selecione um cartão</option>
                       {persistedCreditCards.map(card => (
                         <option key={card.id} value={card.id}>{card.name} - {card.owner}</option>
                       ))}
                     </select>
                     {creditCards.length > persistedCreditCards.length && (
                       <p className="text-[11px] text-amber-400 mt-2">
-                        Alguns cartoes ainda estao sincronizando. Salve em Ajustes e tente novamente.
+                        Alguns cartões ainda estão sincronizando. Salve em Ajustes e tente novamente.
                       </p>
                     )}
                   </div>
@@ -706,7 +706,7 @@ const FinanceView: React.FC<FinanceViewProps> = ({
                       <label className="text-xs font-medium text-slate-300">Tipo</label>
                       <div className="grid grid-cols-2 gap-2">
                         <button type="button" onClick={() => { setIsInstallment(false); setInstallmentCount(1); }} className={`py-2.5 rounded-lg text-xs font-medium border transition-all ${!isInstallment ? 'bg-indigo-600 border-indigo-600 text-white shadow-sm' : 'bg-slate-900 border-slate-700 text-slate-400'}`}>
-                          A Vista
+                          À Vista
                         </button>
                         <button type="button" onClick={() => setIsInstallment(true)} className={`py-2.5 rounded-lg text-xs font-medium border transition-all ${isInstallment ? 'bg-indigo-600 border-indigo-600 text-white shadow-sm' : 'bg-slate-900 border-slate-700 text-slate-400'}`}>
                           Parcelado
@@ -729,7 +729,7 @@ const FinanceView: React.FC<FinanceViewProps> = ({
               )}
 
               <div className="space-y-1">
-                <label className="text-xs font-medium text-slate-300">Classificacao</label>
+                <label className="text-xs font-medium text-slate-300">Classificação</label>
                 <div className={`grid grid-cols-3 gap-1 ${isCardPaymentMethod(paymentMethod) ? 'opacity-50' : ''}`}>
                   {CLASSIFICATIONS.map(c => (
                     <button
@@ -753,7 +753,7 @@ const FinanceView: React.FC<FinanceViewProps> = ({
                     onChange={(e) => setApplyToSeries(e.target.checked)}
                     className="accent-indigo-500"
                   />
-                  Aplicar edicao em todas as parcelas da serie
+                  Aplicar edição em todas as parcelas da série
                 </label>
               )}
             </form>

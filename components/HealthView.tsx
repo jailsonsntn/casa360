@@ -307,8 +307,8 @@ const HealthView: React.FC<HealthViewProps> = ({
         <div className="bg-white dark:bg-zinc-900 rounded-2xl shadow-sm border border-gray-200 dark:border-zinc-800 p-5 mb-6">
           <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-4">
             <div>
-              <h2 className="text-base font-bold text-gray-900 dark:text-zinc-100">Pressao Arterial</h2>
-              <p className="text-xs text-gray-600 dark:text-zinc-400">Registre diariamente, edite e acompanhe seu historico.</p>
+              <h2 className="text-base font-bold text-gray-900 dark:text-zinc-100">Pressão Arterial</h2>
+              <p className="text-xs text-gray-600 dark:text-zinc-400">Registre diariamente, edite e acompanhe seu histórico.</p>
             </div>
             <button
               onClick={openPressureForm}
@@ -320,7 +320,7 @@ const HealthView: React.FC<HealthViewProps> = ({
 
           {bloodPressureEntries.length === 0 ? (
             <div className="rounded-xl border border-dashed border-gray-300 dark:border-zinc-700 p-5 text-center">
-              <p className="text-xs text-gray-600 dark:text-zinc-400">Nenhum registro de pressao ainda.</p>
+              <p className="text-xs text-gray-600 dark:text-zinc-400">Nenhum registro de pressão ainda.</p>
             </div>
           ) : (
             <div className="space-y-2">
@@ -347,7 +347,7 @@ const HealthView: React.FC<HealthViewProps> = ({
                       <button
                         onClick={() => setEditingPressure(entry)}
                         className="p-1.5 text-emerald-700/80 hover:text-blue-600 dark:hover:text-blue-400 transition-colors rounded hover:bg-blue-50 dark:hover:bg-blue-900/20"
-                        title="Editar pressao"
+                        title="Editar pressão"
                       >
                         <Edit2 size={12} />
                       </button>
@@ -625,7 +625,7 @@ const HealthView: React.FC<HealthViewProps> = ({
             <div className="bg-white dark:bg-zinc-900 w-full max-w-sm rounded-2xl shadow-2xl border border-gray-200 dark:border-zinc-800 flex flex-col max-h-[95vh] overflow-hidden animate-in zoom-in-95 duration-200">
               <div className="px-4 py-3 border-b border-gray-100 dark:border-zinc-800 flex justify-between items-center bg-white dark:bg-zinc-900 shrink-0">
                 <h3 className="font-semibold text-sm text-gray-900 dark:text-zinc-100">
-                  {editingPressure ? 'Editar' : 'Nova'} Pressao Arterial
+                  {editingPressure ? 'Editar' : 'Nova'} Pressão Arterial
                 </h3>
                 <button
                   onClick={resetPressureForm}
