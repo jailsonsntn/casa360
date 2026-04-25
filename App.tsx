@@ -66,6 +66,59 @@ const INITIAL_STATE: HomeState = {
 
 type TabId = 'dashboard' | 'routine' | 'finance' | 'health' | 'shopping' | 'settings';
 
+const AUTH_LAST_ACTIVITY_KEY = 'casa360_auth_last_activity';
+const AUTH_MAX_INACTIVITY_MS = 2 * 24 * 60 * 60 * 1000; // 2 dias
+
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+const normalizeCreditCardId = (id?: string | null) => {
+  if (!id) return null;
+  return UUID_REGEX.test(id) ? id : null;
+};
+
+const normalizeCreditCardIdForState = (id?: string | null) => {
+  const normalized = normalizeCreditCardId(id);
+  return normalized || undefined;
+};
+
+const markAuthActivity = () => {
+  try {
+    localStorage.setItem(AUTH_LAST_ACTIVITY_KEY, String(Date.now()));
+  } catch {
+    // Ignore storage failures in restricted contexts.
+  }
+};
+
+const clearAuthActivity = () => {
+  try {
+    localStorage.removeItem(AUTH_LAST_ACTIVITY_KEY);
+  } catch {
+    // Ignore storage failures in restricted contexts.
+  }
+};
+
+const getLastAuthActivity = () => {
+  try {
+    const raw = localStorage.getItem(AUTH_LAST_ACTIVITY_KEY);
+    if (!raw) return null;
+    const parsed = Number(raw);
+    return Number.isFinite(parsed) ? parsed : null;
+  } catch {
+    return null;
+  }
+};
+
+const isSessionExpiredByInactivity = (session: any) => {
+  const lastActivity = getLastAuthActivity();
+  if (!lastActivity) return false;
+
+  const lastSignInAtRaw = session?.user?.last_sign_in_at;
+  const lastSignInAt = lastSignInAtRaw ? new Date(lastSignInAtRaw).getTime() : 0;
+  const reference = Math.max(lastActivity, Number.isFinite(lastSignInAt) ? lastSignInAt : 0);
+
+  return Date.now() - reference > AUTH_MAX_INACTIVITY_MS;
+};
+
 const App: React.FC = () => {
   /* 
     PERSISTENCE: Restore active tab from localStorage if available.
@@ -332,6 +385,46 @@ const App: React.FC = () => {
     }
   }, []);
 
+  // Solicitar permissao de notificacao ao iniciar o app (Android 13+ exige em runtime)
+  useEffect(() => {
+    const requestNotificationPermission = async () => {
+      try {
+        await notificationService.requestPermission();
+      } catch (e) {
+        console.warn('Permissao de notificacao nao concedida:', e);
+      }
+    };
+    requestNotificationPermission();
+  }, []);
+
+  // Mantem a sessao viva por atividade real do usuario e so expira por inatividade longa.
+  useEffect(() => {
+    if (!state.auth.isLoggedIn) return;
+
+    markAuthActivity();
+
+    const onActivity = () => markAuthActivity();
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        markAuthActivity();
+      }
+    };
+
+    window.addEventListener('focus', onActivity);
+    window.addEventListener('pointerdown', onActivity);
+    window.addEventListener('keydown', onActivity);
+    window.addEventListener('touchstart', onActivity, { passive: true });
+    document.addEventListener('visibilitychange', onVisibilityChange);
+
+    return () => {
+      window.removeEventListener('focus', onActivity);
+      window.removeEventListener('pointerdown', onActivity);
+      window.removeEventListener('keydown', onActivity);
+      window.removeEventListener('touchstart', onActivity);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
+    };
+  }, [state.auth.isLoggedIn]);
+
   // Registrar Service Worker para alarmes em background
   useEffect(() => {
     const registerServiceWorker = async () => {
@@ -425,8 +518,19 @@ const App: React.FC = () => {
     const handleAuthChange = async (session: any) => {
       if (!mounted) return;
       if (session?.user) {
+        if (isSessionExpiredByInactivity(session)) {
+          console.warn('Sessao expirada por inatividade maior que 2 dias.');
+          await supabase.auth.signOut();
+          clearAuthActivity();
+          setState(INITIAL_STATE);
+          setLoadingSession(false);
+          return;
+        }
+
+        markAuthActivity();
         await fetchUserData(session.user.id, session.user.email!);
       } else {
+        clearAuthActivity();
         setState(INITIAL_STATE);
         setLoadingSession(false);
       }
@@ -448,10 +552,12 @@ const App: React.FC = () => {
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
       if (!mounted) return;
       if (event === 'SIGNED_IN' || event === 'TOKEN_REFRESHED') {
+        markAuthActivity();
         if (session?.user?.id !== state.auth.userId) {
           handleAuthChange(session);
         }
       } else if (event === 'SIGNED_OUT') {
+        clearAuthActivity();
         setState(INITIAL_STATE);
         setLoadingSession(false);
       }
@@ -807,7 +913,7 @@ const App: React.FC = () => {
       notes: t.notes || '', 
       payment_method: t.paymentMethod, 
       classification: t.classification,
-      credit_card_id: t.creditCardId || null,
+      credit_card_id: normalizeCreditCardId(t.creditCardId),
       is_installment: t.isInstallment || false,
       installment_count: t.installmentCount || null,
       installment_number: t.installmentNumber || null,
@@ -856,7 +962,7 @@ const App: React.FC = () => {
     if (updates.notes !== undefined) dbUpdates.notes = updates.notes;
     if (updates.paymentMethod !== undefined) dbUpdates.payment_method = updates.paymentMethod;
     if (updates.classification !== undefined) dbUpdates.classification = updates.classification;
-    if (updates.creditCardId !== undefined) dbUpdates.credit_card_id = updates.creditCardId;
+    if (updates.creditCardId !== undefined) dbUpdates.credit_card_id = normalizeCreditCardId(updates.creditCardId);
     if (updates.isInstallment !== undefined) dbUpdates.is_installment = updates.isInstallment;
     if (updates.installmentCount !== undefined) dbUpdates.installment_count = updates.installmentCount;
     if (updates.installmentNumber !== undefined) dbUpdates.installment_number = updates.installmentNumber;
@@ -870,7 +976,11 @@ const App: React.FC = () => {
       console.error("Erro ao atualizar transação:", error);
     } else {
       console.log("Transação atualizada com sucesso");
-      setState(p => ({ ...p, finance: p.finance.map(t => t.id === id ? { ...t, ...updates } : t) }));
+      const safeUpdates: Partial<Transaction> = {
+        ...updates,
+        creditCardId: updates.creditCardId !== undefined ? normalizeCreditCardIdForState(updates.creditCardId) : updates.creditCardId,
+      };
+      setState(p => ({ ...p, finance: p.finance.map(t => t.id === id ? { ...t, ...safeUpdates } : t) }));
     }
   };
 
@@ -886,7 +996,7 @@ const App: React.FC = () => {
     if (updates.notes !== undefined) dbUpdates.notes = updates.notes;
     if (updates.paymentMethod !== undefined) dbUpdates.payment_method = updates.paymentMethod;
     if (updates.classification !== undefined) dbUpdates.classification = updates.classification;
-    if (updates.creditCardId !== undefined) dbUpdates.credit_card_id = updates.creditCardId;
+    if (updates.creditCardId !== undefined) dbUpdates.credit_card_id = normalizeCreditCardId(updates.creditCardId);
     if (updates.isInstallment !== undefined) dbUpdates.is_installment = updates.isInstallment;
     if (updates.installmentCount !== undefined) dbUpdates.installment_count = updates.installmentCount;
 
@@ -901,10 +1011,15 @@ const App: React.FC = () => {
       return;
     }
 
+    const safeUpdates: Partial<Transaction> = {
+      ...updates,
+      creditCardId: updates.creditCardId !== undefined ? normalizeCreditCardIdForState(updates.creditCardId) : updates.creditCardId,
+    };
+
     setState(prev => ({
       ...prev,
       finance: prev.finance.map(t =>
-        t.originalTransactionId === seriesId ? { ...t, ...updates } : t
+        t.originalTransactionId === seriesId ? { ...t, ...safeUpdates } : t
       )
     }));
   };
@@ -1013,16 +1128,18 @@ const App: React.FC = () => {
       console.log("Perfil atualizado com sucesso:", data);
     }
 
+    let syncedCreditCards = creditCards;
+
     // Salvar cartões de crédito se fornecidos
     if (creditCards !== undefined) {
-      await syncCreditCards(creditCards);
+      syncedCreditCards = await syncCreditCards(creditCards);
     }
 
     setState(prev => ({
       ...prev,
       profile: { ...profile },
       theme,
-      creditCards: creditCards !== undefined ? creditCards : prev.creditCards
+      creditCards: syncedCreditCards !== undefined ? syncedCreditCards : prev.creditCards
     }));
 
     // Mantemos visual dark para alinhar com o design FinControl em toda a aplicação.
@@ -1030,7 +1147,7 @@ const App: React.FC = () => {
   };
 
   const syncCreditCards = async (cards: CreditCard[]) => {
-    if (!state.auth.userId) return;
+    if (!state.auth.userId) return cards;
 
     try {
       // Obter cartões existentes no banco
@@ -1041,7 +1158,7 @@ const App: React.FC = () => {
 
       if (fetchError) {
         console.error("Erro ao buscar cartões existentes:", fetchError.message);
-        return;
+        return cards;
       }
 
       const existingIds = new Set((existingCards || []).map(c => c.id));
@@ -1095,7 +1212,30 @@ const App: React.FC = () => {
       }
     } catch (err) {
       console.error("Erro ao sincronizar cartões:", err);
+      return cards;
     }
+
+    const { data: reloadedCards, error: reloadError } = await supabase
+      .from('credit_cards')
+      .select('*')
+      .eq('user_id', state.auth.userId)
+      .order('created_at', { ascending: false });
+
+    if (reloadError) {
+      console.error('Erro ao recarregar cartões após sincronização:', reloadError.message);
+      return cards;
+    }
+
+    const mappedCards: CreditCard[] = (reloadedCards || []).map((c: any) => ({
+      ...c,
+      cardType: c.card_type || c.cardType,
+      lastFourDigits: c.last_four_digits || c.lastFourDigits,
+      isActive: c.is_active !== undefined ? c.is_active : c.isActive,
+      closingDay: c.closing_day || c.closingDay || 1,
+      createdAt: c.created_at || c.createdAt
+    }));
+
+    return mappedCards;
   };
 
   const navItems = [

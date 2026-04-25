@@ -55,6 +55,7 @@ const CLASSIFICATIONS: { id: TransactionClassification; label: string }[] = [
 ];
 
 const MONTHS = ['Janeiro', 'Fevereiro', 'Marco', 'Abril', 'Maio', 'Junho', 'Julho', 'Agosto', 'Setembro', 'Outubro', 'Novembro', 'Dezembro'];
+const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
 const FinanceView: React.FC<FinanceViewProps> = ({
   transactions,
@@ -69,6 +70,7 @@ const FinanceView: React.FC<FinanceViewProps> = ({
   const [isAdding, setIsAdding] = useState(false);
   const [editingItem, setEditingItem] = useState<Transaction | null>(null);
   const [itemToDelete, setItemToDelete] = useState<Transaction | null>(null);
+  const [viewMode, setViewMode] = useState<'overview' | 'cards'>('overview');
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
   const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
 
@@ -165,6 +167,40 @@ const FinanceView: React.FC<FinanceViewProps> = ({
     [monthTransactions]
   );
 
+  const persistedCreditCards = useMemo(
+    () => creditCards.filter(card => card.isActive && UUID_REGEX.test(card.id)),
+    [creditCards]
+  );
+
+  const creditCardMap = useMemo(
+    () => new Map(persistedCreditCards.map(card => [card.id, card])),
+    [persistedCreditCards]
+  );
+
+  const monthCardSummaries = useMemo(() => {
+    return persistedCreditCards.map(card => {
+      const launches = monthTransactions
+        .filter(tx => tx.paymentMethod === 'credit_card' && tx.creditCardId === card.id)
+        .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+      const total = launches.reduce((sum, tx) => sum + tx.value, 0);
+
+      return {
+        card,
+        launches,
+        total,
+      };
+    }).sort((a, b) => b.total - a.total);
+  }, [persistedCreditCards, monthTransactions]);
+
+  const getPaymentMethodLabel = (method: PaymentMethod) => {
+    if (method === 'credit_card') return 'Cartao de credito';
+    if (method === 'debit_card') return 'Cartao de debito';
+    if (method === 'cash') return 'Dinheiro';
+    if (method === 'transfer') return 'Transferencia';
+    return 'Pix';
+  };
+
   const handleOpenEdit = (tx: Transaction) => {
     setEditingItem(tx);
     setType(tx.type);
@@ -247,7 +283,7 @@ const FinanceView: React.FC<FinanceViewProps> = ({
     }
 
     if (isInstallment && installmentCount > 1 && paymentMethod === 'credit_card') {
-      const card = creditCards.find(c => c.id === selectedCreditCardId);
+      const card = persistedCreditCards.find(c => c.id === selectedCreditCardId);
       if (!card) return;
 
       const purchaseDate = new Date(date);
@@ -336,6 +372,23 @@ const FinanceView: React.FC<FinanceViewProps> = ({
         </div>
       </div>
 
+      <div className="inline-flex rounded-xl border border-slate-700 bg-slate-950/70 p-1 gap-1">
+        <button
+          type="button"
+          onClick={() => setViewMode('overview')}
+          className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${viewMode === 'overview' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'}`}
+        >
+          Visao Geral
+        </button>
+        <button
+          type="button"
+          onClick={() => setViewMode('cards')}
+          className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${viewMode === 'cards' ? 'bg-indigo-600 text-white' : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'}`}
+        >
+          Por Cartao
+        </button>
+      </div>
+
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-4">
         <div className="rounded-2xl border border-indigo-500/35 bg-slate-950/70 p-5">
           <div className="flex items-center justify-between mb-4">
@@ -378,6 +431,7 @@ const FinanceView: React.FC<FinanceViewProps> = ({
         </div>
       </div>
 
+      {viewMode === 'overview' && (
       <div className="grid grid-cols-1 xl:grid-cols-3 gap-4">
         <div className="xl:col-span-2 rounded-2xl border border-slate-700 bg-slate-950/70 p-5">
           <h3 className="text-sm font-semibold text-slate-200 mb-4">Evolucao dos ultimos 6 meses</h3>
@@ -441,6 +495,60 @@ const FinanceView: React.FC<FinanceViewProps> = ({
         </div>
       </div>
 
+      )}
+
+      {viewMode === 'cards' && (
+        <div className="space-y-4">
+          <div className="rounded-2xl border border-indigo-500/30 bg-slate-950/70 p-5 flex items-center justify-between">
+            <div>
+              <p className="text-xs uppercase tracking-wider text-slate-400">Total em cartoes neste mes</p>
+              <p className="text-4xl font-bold text-indigo-300 mt-2">R$ {monthCardExpense.toLocaleString('pt-BR')}</p>
+              <p className="text-xs text-slate-500 mt-2">{MONTHS[selectedMonth]} {selectedYear}</p>
+            </div>
+            <CreditCardIcon className="text-indigo-400" size={22} />
+          </div>
+
+          {monthCardSummaries.length === 0 ? (
+            <div className="rounded-2xl border border-slate-700 bg-slate-950/70 py-12 text-center text-slate-500 text-sm">
+              Nenhum cartao ativo para visualizar.
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 lg:grid-cols-2 gap-4">
+              {monthCardSummaries.map(({ card, launches, total }) => (
+                <div key={card.id} className="rounded-2xl border border-slate-700 bg-slate-950/70 p-4">
+                  <div className="flex items-center justify-between mb-3">
+                    <div>
+                      <p className="text-sm font-bold text-slate-100">{card.name}</p>
+                      <p className="text-xs text-slate-500">{card.owner} • fecha dia {card.closingDay}</p>
+                    </div>
+                    <p className="text-xl font-bold text-indigo-300">R$ {total.toLocaleString('pt-BR')}</p>
+                  </div>
+
+                  {launches.length === 0 ? (
+                    <p className="text-xs text-slate-500">Sem lancamentos neste mes.</p>
+                  ) : (
+                    <div className="space-y-2 max-h-52 overflow-y-auto pr-1">
+                      {launches.slice(0, 8).map(tx => (
+                        <div key={tx.id} className="flex items-center justify-between rounded-lg border border-slate-800 bg-slate-900/70 px-3 py-2">
+                          <div>
+                            <p className="text-xs font-semibold text-slate-200">{tx.category}</p>
+                            <p className="text-[11px] text-slate-500">{new Date(tx.date).toLocaleDateString('pt-BR')}</p>
+                          </div>
+                          <p className="text-xs font-bold text-rose-300">- R$ {tx.value.toLocaleString('pt-BR')}</p>
+                        </div>
+                      ))}
+                      {launches.length > 8 && (
+                        <p className="text-[11px] text-slate-500 text-center pt-1">+ {launches.length - 8} lancamento(s)</p>
+                      )}
+                    </div>
+                  )}
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+      )}
+
       <div className="rounded-2xl border border-slate-700 bg-slate-950/70 overflow-hidden">
         <div className="px-5 py-4 border-b border-slate-800 flex items-center justify-between">
           <h3 className="text-sm font-semibold text-slate-200">Lancamentos recentes</h3>
@@ -455,7 +563,14 @@ const FinanceView: React.FC<FinanceViewProps> = ({
               <div key={tx.id} className="px-5 py-3 flex items-center justify-between hover:bg-slate-900/60 transition-colors group">
                 <div>
                   <p className="text-sm font-semibold text-slate-200">{tx.category}</p>
-                  <p className="text-xs text-slate-500">{new Date(tx.date).toLocaleDateString('pt-BR')}  {tx.paymentMethod}</p>
+                  <div className="flex items-center gap-2 mt-1">
+                    <p className="text-xs text-slate-500">{new Date(tx.date).toLocaleDateString('pt-BR')}  {getPaymentMethodLabel(tx.paymentMethod)}</p>
+                    {tx.paymentMethod === 'credit_card' && tx.creditCardId && creditCardMap.get(tx.creditCardId) && (
+                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-indigo-500/15 border border-indigo-400/30 text-indigo-300">
+                        {creditCardMap.get(tx.creditCardId)?.name}
+                      </span>
+                    )}
+                  </div>
                 </div>
                 <div className="flex items-center gap-3">
                   <p className={`text-sm font-bold ${tx.type === 'income' ? 'text-emerald-400' : 'text-rose-400'}`}>
@@ -575,10 +690,15 @@ const FinanceView: React.FC<FinanceViewProps> = ({
                     <label className="text-xs font-medium text-slate-300">Cartao de Credito</label>
                     <select value={selectedCreditCardId} onChange={e => setSelectedCreditCardId(e.target.value)} className="w-full bg-slate-900 border border-slate-700 rounded-lg px-3 py-2 outline-none font-medium text-xs text-slate-100 focus:border-indigo-500" required={paymentMethod === 'credit_card'}>
                       <option value="">Selecione um cartao</option>
-                      {creditCards.filter(card => card.isActive).map(card => (
+                      {persistedCreditCards.map(card => (
                         <option key={card.id} value={card.id}>{card.name} - {card.owner}</option>
                       ))}
                     </select>
+                    {creditCards.length > persistedCreditCards.length && (
+                      <p className="text-[11px] text-amber-400 mt-2">
+                        Alguns cartoes ainda estao sincronizando. Salve em Ajustes e tente novamente.
+                      </p>
+                    )}
                   </div>
 
                   {selectedCreditCardId && (

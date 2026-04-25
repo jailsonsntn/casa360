@@ -37,5 +37,25 @@
 
     <!-- Permissions -->
 
+    <!-- Rede -->
     <uses-permission android:name="android.permission.INTERNET" />
+
+    <!-- Notificacoes (obrigatorio solicitar em tempo de execucao no Android 13+) -->
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+
+    <!-- Vibrar o dispositivo -->
+    <uses-permission android:name="android.permission.VIBRATE" />
+
+    <!-- Manter CPU ativa durante alarme -->
+    <uses-permission android:name="android.permission.WAKE_LOCK" />
+
+    <!-- Alarmes exatos (Android 12+ requer permissao declarada) -->
+    <uses-permission android:name="android.permission.SCHEDULE_EXACT_ALARM" />
+    <uses-permission android:name="android.permission.USE_EXACT_ALARM" />
+
+    <!-- Reiniciar alarmes apos reboot -->
+    <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED" />
+
+    <!-- Service em background para monitoramento de alarmes -->
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
 </manifest>

@@ -1,5 +1,23 @@
 apply plugin: 'com.android.application'
 
+def keystoreProperties = new Properties()
+def keystorePropertiesFile = rootProject.file('keystore.properties')
+if (keystorePropertiesFile.exists()) {
+    keystoreProperties.load(new FileInputStream(keystorePropertiesFile))
+}
+
+def envStoreFile = System.getenv('ANDROID_KEYSTORE_FILE')
+def envStorePassword = System.getenv('ANDROID_KEYSTORE_PASSWORD')
+def envKeyAlias = System.getenv('ANDROID_KEY_ALIAS')
+def envKeyPassword = System.getenv('ANDROID_KEY_PASSWORD')
+
+def signingStoreFile = envStoreFile ?: keystoreProperties['storeFile']
+def signingStorePassword = envStorePassword ?: keystoreProperties['storePassword']
+def signingKeyAlias = envKeyAlias ?: keystoreProperties['keyAlias']
+def signingKeyPassword = envKeyPassword ?: keystoreProperties['keyPassword']
+
+def hasReleaseSigning = signingStoreFile && signingStorePassword && signingKeyAlias && signingKeyPassword
+
 android {
     namespace = "com.casa360"
     compileSdk = rootProject.ext.compileSdkVersion
@@ -16,12 +34,39 @@ android {
             ignoreAssetsPattern = '!.svn:!.git:!.ds_store:!*.scc:.*:!CVS:!thumbs.db:!picasa.ini:!*~'
         }
     }
+    signingConfigs {
+        release {
+            if (hasReleaseSigning) {
+                storeFile file(signingStoreFile)
+                storePassword signingStorePassword
+                keyAlias signingKeyAlias
+                keyPassword signingKeyPassword
+            }
+        }
+    }
+
     buildTypes {
         release {
             minifyEnabled false
             proguardFiles getDefaultProguardFile('proguard-android.txt'), 'proguard-rules.pro'
+
+            if (hasReleaseSigning) {
+                signingConfig signingConfigs.getByName('release')
+            }
         }
     }
+
+    applicationVariants.configureEach { variant ->
+        if (variant.buildType.name == 'release') {
+            variant.outputs.configureEach {
+                outputFileName = 'casa360.apk'
+            }
+        }
+    }
+}
+
+if (!hasReleaseSigning) {
+    logger.lifecycle('Release sem assinatura configurada. Defina variaveis ANDROID_KEYSTORE_* ou android/keystore.properties.')
 }
 
 repositories {

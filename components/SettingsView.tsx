@@ -159,8 +159,9 @@ const SettingsView: React.FC<SettingsViewProps> = ({ state, onUpdate, onLogout }
       const granted = await notificationService.ensureNotificationPermission();
       if (!granted) {
         setLocalProfile(prev => ({ ...prev, alarmSettings: { ...prev.alarmSettings, notificationsEnabled: false } }));
-        alert('Permissão de notificação não concedida. Ative nas configurações do navegador/dispositivo.');
+        alert('Permissão de notificação não concedida. Acesse Configurações > Apps > Casa 360 > Notificações e ative.');
         return;
+
       }
     }
 

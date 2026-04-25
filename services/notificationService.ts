@@ -1,5 +1,6 @@
 
 import { AlarmSoundType, VibrationIntensity } from '../types';
+import { LocalNotifications } from '@capacitor/local-notifications';
 
 type NotificationPermissionState = NotificationPermission | 'unsupported';
 
@@ -12,6 +13,26 @@ interface PlatformInfo {
   supportsVibration: boolean;
   supportsAudioContext: boolean;
 }
+
+const NATIVE_PERMISSION_CACHE_KEY = 'casa360_native_notification_permission';
+
+const readNativePermissionCache = (): NotificationPermission => {
+  if (typeof window === 'undefined') return 'default';
+  const cached = localStorage.getItem(NATIVE_PERMISSION_CACHE_KEY);
+  if (cached === 'granted' || cached === 'denied' || cached === 'default') return cached;
+  return 'default';
+};
+
+const writeNativePermissionCache = (status: NotificationPermission) => {
+  if (typeof window === 'undefined') return;
+  localStorage.setItem(NATIVE_PERMISSION_CACHE_KEY, status);
+};
+
+const normalizeNativeDisplayPermission = (display?: string): NotificationPermission => {
+  if (display === 'granted') return 'granted';
+  if (display === 'denied') return 'denied';
+  return 'default';
+};
 
 const getPlatformInfo = (): PlatformInfo => {
   const hasWindow = typeof window !== 'undefined';
@@ -29,6 +50,9 @@ const getPlatformInfo = (): PlatformInfo => {
 
 const getPermissionStatus = (): NotificationPermissionState => {
   const platform = getPlatformInfo();
+  // No nativo, usamos cache local. O valor real e sincronizado por
+  // requestPermission/ensureNotificationPermission via plugin nativo.
+  if (platform.isNativeLike) return readNativePermissionCache();
   if (!platform.supportsNotificationApi) return 'unsupported';
   return Notification.permission;
 };
@@ -39,6 +63,22 @@ export const notificationService = {
 
   requestPermission: async () => {
     const platform = getPlatformInfo();
+    if (platform.isNativeLike) {
+      try {
+        const current = await LocalNotifications.checkPermissions();
+        const currentStatus = normalizeNativeDisplayPermission(current.display);
+        writeNativePermissionCache(currentStatus);
+        if (currentStatus === 'granted') return true;
+
+        const requested = await LocalNotifications.requestPermissions();
+        const requestedStatus = normalizeNativeDisplayPermission(requested.display);
+        writeNativePermissionCache(requestedStatus);
+        return requestedStatus === 'granted';
+      } catch (e) {
+        console.warn('Falha ao solicitar permissao nativa de notificacao:', e);
+        return false;
+      }
+    }
     if (!platform.supportsNotificationApi || !platform.isBrowser) return false;
     if (Notification.permission === 'granted') return true;
     if (Notification.permission === 'denied') return false;
@@ -47,6 +87,22 @@ export const notificationService = {
   },
 
   ensureNotificationPermission: async () => {
+    const platform = getPlatformInfo();
+    if (platform.isNativeLike) {
+      try {
+        const current = await LocalNotifications.checkPermissions();
+        const currentStatus = normalizeNativeDisplayPermission(current.display);
+        writeNativePermissionCache(currentStatus);
+
+        if (currentStatus === 'granted') return true;
+        if (currentStatus === 'denied') return false;
+        return notificationService.requestPermission();
+      } catch (e) {
+        console.warn('Falha ao verificar permissao nativa de notificacao:', e);
+        return false;
+      }
+    }
+
     const status = getPermissionStatus();
     if (status === 'granted') return true;
     if (status === 'denied' || status === 'unsupported') return false;
@@ -55,6 +111,19 @@ export const notificationService = {
 
   sendLocalNotification: (title: string, body: string, urgent: boolean = false) => {
     const platform = getPlatformInfo();
+
+    // No Android nativo, dispara notificacao local via plugin Capacitor.
+    if (platform.isNativeLike) {
+      void LocalNotifications.schedule({
+        notifications: [{
+          id: Date.now() % 2147483000,
+          title,
+          body,
+          schedule: { at: new Date(Date.now() + 200) }
+        }]
+      });
+      return true;
+    }
     if (!platform.supportsNotificationApi || Notification.permission !== 'granted') return false;
     try {
       const n = new Notification(title, {

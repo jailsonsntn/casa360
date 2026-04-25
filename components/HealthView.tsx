@@ -253,7 +253,7 @@ const HealthView: React.FC<HealthViewProps> = ({
       const granted = await notificationService.ensureNotificationPermission();
       setNotificationEnabled(granted);
       if (!granted) {
-        alert('Permissão de notificação não concedida. Ative nas configurações do navegador/dispositivo.');
+        alert('Permissão de notificação não concedida. Acesse Configurações > Apps > Casa 360 > Notificações e ative.');
       }
     } else {
       setNotificationEnabled(false);
