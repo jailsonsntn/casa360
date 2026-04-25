@@ -68,11 +68,42 @@ const Dashboard: React.FC<DashboardProps> = ({ state, onAction }) => {
     return taskDate.toDateString() === today.toDateString();
   });
 
+  const getMedicationIntervalHours = (frequency: string): number | null => {
+    const normalized = (frequency || '').toLowerCase().trim();
+
+    if (normalized === 'daily') return 24;
+    if (normalized === 'twice_daily') return 12;
+    if (normalized === 'weekly') return 24 * 7;
+
+    const hourMatch = normalized.match(/(\d+)h\/(\d+)h/);
+    if (hourMatch) {
+      const hours = Number(hourMatch[1]);
+      return Number.isFinite(hours) && hours > 0 ? hours : null;
+    }
+
+    return null;
+  };
+
   // Medicamentos para hoje
   const todayMeds = state.medications.filter(med => {
+    if (!med.isActive) return false;
+
     const lastTaken = med.lastTaken ? new Date(med.lastTaken) : null;
+    const firstDoseDate = med.firstDoseDate ? new Date(med.firstDoseDate) : null;
     const now = new Date();
-    const hoursSinceLast = lastTaken ? (now.getTime() - lastTaken.getTime()) / (1000 * 60 * 60) : 24;
+    const hoursSinceLast = lastTaken ? (now.getTime() - lastTaken.getTime()) / (1000 * 60 * 60) : Number.POSITIVE_INFINITY;
+
+    if (firstDoseDate) {
+      firstDoseDate.setHours(0, 0, 0, 0);
+      const today = new Date(now);
+      today.setHours(0, 0, 0, 0);
+      if (firstDoseDate > today) return false;
+    }
+
+    const intervalHours = getMedicationIntervalHours(med.frequency);
+    if (intervalHours !== null) {
+      return hoursSinceLast >= intervalHours;
+    }
 
     // Verificar se precisa tomar baseado na frequência
     if (med.frequency === 'daily' && hoursSinceLast >= 24) return true;
@@ -81,6 +112,11 @@ const Dashboard: React.FC<DashboardProps> = ({ state, onAction }) => {
 
     return false;
   });
+
+  const activeMeds = state.medications.filter(med => med.isActive);
+  const medsInCard = todayMeds.length > 0 ? todayMeds : activeMeds;
+  const medsCardCount = todayMeds.length > 0 ? todayMeds.length : activeMeds.length;
+  const medsCardLabel = todayMeds.length > 0 ? 'Para hoje' : 'Cadastrados';
 
   const lowStockMeds = state.medications.filter(m => m.stockQuantity <= m.minStock);
   const pendingShopping = state.shoppingList.filter(s => !s.isPurchased);
@@ -175,22 +211,31 @@ const Dashboard: React.FC<DashboardProps> = ({ state, onAction }) => {
           <div className="flex items-center justify-between mb-4">
             <HeartPulse className="w-8 h-8 text-red-600" />
             <div className="text-right">
-              <p className="text-2xl font-bold text-slate-900 dark:text-zinc-100">{todayMeds.length}</p>
-              <p className="text-xs text-slate-600 dark:text-zinc-400">Para hoje</p>
+              <p className="text-2xl font-bold text-slate-900 dark:text-zinc-100">{medsCardCount}</p>
+              <p className="text-xs text-slate-600 dark:text-zinc-400">{medsCardLabel}</p>
             </div>
           </div>
           <div className="space-y-2">
-            {todayMeds.length > 0 ? (
-              <div className="flex items-center gap-2 text-sm">
-                <Pill className="w-4 h-4 text-red-500" />
-                <span className="text-slate-600 dark:text-zinc-400">
-                  {todayMeds[0].name}
-                </span>
-              </div>
+            {medsInCard.length > 0 ? (
+              <>
+                {medsInCard.slice(0, 3).map(med => (
+                  <div key={med.id} className="flex items-center gap-2 text-sm">
+                    <Pill className="w-4 h-4 text-red-500" />
+                    <span className="text-slate-600 dark:text-zinc-400 truncate" title={med.name}>
+                      {med.name}
+                    </span>
+                  </div>
+                ))}
+                {medsInCard.length > 3 && (
+                  <div className="text-xs text-slate-500 dark:text-zinc-500 pl-6">
+                    +{medsInCard.length - 3} medicamento(s)
+                  </div>
+                )}
+              </>
             ) : (
               <div className="flex items-center gap-2 text-sm">
                 <CheckCircle2 className="w-4 h-4 text-emerald-500" />
-                <span className="text-slate-600 dark:text-zinc-400">Tudo em dia</span>
+                <span className="text-slate-600 dark:text-zinc-400">Nenhum medicamento ativo</span>
               </div>
             )}
             {lowStockMeds.length > 0 && (

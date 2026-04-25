@@ -103,6 +103,16 @@ export interface Medication {
   doseHistory?: MedicationDose[]; // Histórico de doses
 }
 
+export interface BloodPressureEntry {
+  id: string;
+  systolic: number;
+  diastolic: number;
+  pulse?: number;
+  measuredAt: string;
+  notes?: string;
+  createdAt: string;
+}
+
 export interface Transaction {
   id: string;
   type: TransactionType;
@@ -189,6 +199,7 @@ export interface HomeState {
   finance: Transaction[];
   reminders: Reminder[];
   medications: Medication[];
+  bloodPressureEntries: BloodPressureEntry[];
   shoppingList: ShoppingItem[];
   creditCards: CreditCard[];
   investments: Investment[];

@@ -101,6 +101,28 @@ alter table finance enable row level security;
 create policy "Users can CRUD own finance" on finance
   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
 
+-- FINANCE INSTALLMENT OPTIMIZATIONS
+create index if not exists idx_finance_user_date on finance(user_id, date desc);
+create index if not exists idx_finance_user_payment_method on finance(user_id, payment_method);
+create index if not exists idx_finance_user_credit_card on finance(user_id, credit_card_id);
+create index if not exists idx_finance_user_installment_series on finance(user_id, original_transaction_id);
+
+alter table finance
+  add constraint finance_installment_count_check
+  check (installment_count is null or installment_count >= 1);
+
+alter table finance
+  add constraint finance_installment_number_check
+  check (installment_number is null or installment_number >= 1);
+
+alter table finance
+  add constraint finance_installment_pair_check
+  check (
+    (is_installment = false and installment_count is null and installment_number is null)
+    or
+    (is_installment = true and installment_count is not null and installment_number is not null)
+  );
+
 -- MEDICATIONS TABLE
 create table medications (
   id uuid default uuid_generate_v4() primary key,
@@ -198,3 +220,23 @@ alter table medication_doses enable row level security;
 
 create policy "Users can CRUD own medication doses" on medication_doses
   for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+-- BLOOD PRESSURE ENTRIES TABLE (Registros diarios de pressao arterial)
+create table blood_pressure_entries (
+  id uuid default uuid_generate_v4() primary key,
+  user_id uuid references auth.users on delete cascade not null,
+  systolic integer not null,
+  diastolic integer not null,
+  pulse integer,
+  measured_at timestamp with time zone default timezone('utc'::text, now()) not null,
+  notes text,
+  created_at timestamp with time zone default timezone('utc'::text, now()) not null
+);
+
+alter table blood_pressure_entries enable row level security;
+
+create policy "Users can CRUD own blood pressure entries" on blood_pressure_entries
+  for all using (auth.uid() = user_id) with check (auth.uid() = user_id);
+
+create index if not exists idx_blood_pressure_user_measured_at
+  on blood_pressure_entries(user_id, measured_at desc);

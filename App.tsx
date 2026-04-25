@@ -21,7 +21,7 @@ import {
   ShieldAlert,
   Bell
 } from 'lucide-react';
-import { Task, Transaction, HomeState, Medication, UserProfile, AuthState, ShoppingItem, CreditCard, Investment, FinancialGoal } from './types';
+import { Task, Transaction, HomeState, Medication, UserProfile, AuthState, ShoppingItem, CreditCard, Investment, FinancialGoal, BloodPressureEntry } from './types';
 import Dashboard from './components/Dashboard';
 import RoutineView from './components/RoutineView';
 import FinanceView from './components/FinanceView';
@@ -54,6 +54,7 @@ const INITIAL_STATE: HomeState = {
   tasks: [],
   finance: [],
   medications: [],
+  bloodPressureEntries: [],
   shoppingList: [],
   reminders: [],
   creditCards: [],
@@ -193,7 +194,8 @@ const App: React.FC = () => {
         supabase.from('credit_cards').select('*').eq('user_id', userId).order('created_at', { ascending: false }),
         supabase.from('investments').select('*').eq('user_id', userId).order('created_at', { ascending: false }),
         supabase.from('financial_goals').select('*').eq('user_id', userId).order('created_at', { ascending: false }),
-        supabase.from('medication_doses').select('*').eq('user_id', userId).order('taken_at', { ascending: false })
+        supabase.from('medication_doses').select('*').eq('user_id', userId).order('taken_at', { ascending: false }),
+        supabase.from('blood_pressure_entries').select('*').eq('user_id', userId).order('measured_at', { ascending: false })
       ]);
 
       const profileData = results[0].status === 'fulfilled' && (results[0].value as any)?.data ? (results[0].value as any).data : null;
@@ -205,6 +207,7 @@ const App: React.FC = () => {
       const investmentsRaw = results[6].status === 'fulfilled' && (results[6].value as any)?.data ? (results[6].value as any).data : [];
       const goalsRaw = results[7].status === 'fulfilled' && (results[7].value as any)?.data ? (results[7].value as any).data : [];
       const dosesRaw = results[8].status === 'fulfilled' && (results[8].value as any)?.data ? (results[8].value as any).data : [];
+      const pressureRaw = results[9].status === 'fulfilled' && (results[9].value as any)?.data ? (results[9].value as any).data : [];
 
       const tasks: Task[] = (tasksRaw || []).map((t: any) => ({
         ...t,
@@ -283,6 +286,16 @@ const App: React.FC = () => {
         createdAt: g.created_at || g.createdAt
       }));
 
+      const bloodPressureEntries: BloodPressureEntry[] = (pressureRaw || []).map((bp: any) => ({
+        id: bp.id,
+        systolic: bp.systolic,
+        diastolic: bp.diastolic,
+        pulse: bp.pulse,
+        measuredAt: bp.measured_at,
+        notes: bp.notes,
+        createdAt: bp.created_at
+      }));
+
       setState(prev => ({
         ...prev,
         auth: { isLoggedIn: true, userEmail: email, userId: userId, lastLogin: new Date().toISOString() },
@@ -305,6 +318,7 @@ const App: React.FC = () => {
         tasks,
         finance,
         medications,
+        bloodPressureEntries,
         shoppingList,
         creditCards,
         investments,
@@ -624,10 +638,152 @@ const App: React.FC = () => {
     }
   };
 
+  const deleteMedicationDose = async (medicationId: string, doseId: string) => {
+    if (!state.auth.userId) return;
+
+    const med = state.medications.find(m => m.id === medicationId);
+    if (!med) return;
+
+    const updatedDoseHistory = (med.doseHistory || [])
+      .filter(d => d.id !== doseId)
+      .sort((a, b) => new Date(b.takenAt).getTime() - new Date(a.takenAt).getTime());
+
+    const newLastTaken = updatedDoseHistory[0]?.takenAt || null;
+    const newStock = med.stockQuantity + 1;
+
+    const { error: deleteError } = await supabase
+      .from('medication_doses')
+      .delete()
+      .eq('id', doseId)
+      .eq('user_id', state.auth.userId)
+      .eq('medication_id', medicationId);
+
+    if (deleteError) {
+      console.error('Erro ao apagar dose:', deleteError);
+      return;
+    }
+
+    const { error: updateError } = await supabase
+      .from('medications')
+      .update({
+        stock_quantity: newStock,
+        last_taken: newLastTaken
+      })
+      .eq('id', medicationId)
+      .eq('user_id', state.auth.userId);
+
+    if (updateError) {
+      console.error('Erro ao atualizar medicamento após apagar dose:', updateError);
+      return;
+    }
+
+    setState(prev => ({
+      ...prev,
+      medications: prev.medications.map(m =>
+        m.id === medicationId
+          ? {
+              ...m,
+              stockQuantity: newStock,
+              lastTaken: newLastTaken || undefined,
+              doseHistory: (m.doseHistory || []).filter(d => d.id !== doseId)
+            }
+          : m
+      )
+    }));
+  };
+
   const deleteMedication = async (id: string) => {
     if (!state.auth.userId) return;
     const { error } = await supabase.from('medications').delete().eq('id', id);
     if (!error) setState(p => ({ ...p, medications: p.medications.filter(m => m.id !== id) }));
+  };
+
+  const addBloodPressureEntry = async (entry: Omit<BloodPressureEntry, 'id' | 'createdAt'>) => {
+    if (!state.auth.userId) return;
+
+    const { data, error } = await supabase
+      .from('blood_pressure_entries')
+      .insert([{
+        user_id: state.auth.userId,
+        systolic: entry.systolic,
+        diastolic: entry.diastolic,
+        pulse: entry.pulse || null,
+        measured_at: entry.measuredAt,
+        notes: entry.notes || null
+      }])
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Erro ao adicionar pressão arterial:', error.message);
+      return;
+    }
+
+    if (data) {
+      const mappedEntry: BloodPressureEntry = {
+        id: data.id,
+        systolic: data.systolic,
+        diastolic: data.diastolic,
+        pulse: data.pulse,
+        measuredAt: data.measured_at,
+        notes: data.notes,
+        createdAt: data.created_at
+      };
+
+      setState(prev => ({
+        ...prev,
+        bloodPressureEntries: [mappedEntry, ...prev.bloodPressureEntries]
+      }));
+    }
+  };
+
+  const updateBloodPressureEntry = async (id: string, updates: Partial<Omit<BloodPressureEntry, 'id' | 'createdAt'>>) => {
+    if (!state.auth.userId) return;
+
+    const dbUpdates: any = {};
+    if (updates.systolic !== undefined) dbUpdates.systolic = updates.systolic;
+    if (updates.diastolic !== undefined) dbUpdates.diastolic = updates.diastolic;
+    if (updates.pulse !== undefined) dbUpdates.pulse = updates.pulse;
+    if (updates.measuredAt !== undefined) dbUpdates.measured_at = updates.measuredAt;
+    if (updates.notes !== undefined) dbUpdates.notes = updates.notes;
+
+    const { error } = await supabase
+      .from('blood_pressure_entries')
+      .update(dbUpdates)
+      .eq('id', id)
+      .eq('user_id', state.auth.userId);
+
+    if (error) {
+      console.error('Erro ao atualizar pressão arterial:', error.message);
+      return;
+    }
+
+    setState(prev => ({
+      ...prev,
+      bloodPressureEntries: prev.bloodPressureEntries.map(entry =>
+        entry.id === id ? { ...entry, ...updates } : entry
+      )
+    }));
+  };
+
+  const deleteBloodPressureEntry = async (id: string) => {
+    if (!state.auth.userId) return;
+
+    const { error } = await supabase
+      .from('blood_pressure_entries')
+      .delete()
+      .eq('id', id)
+      .eq('user_id', state.auth.userId);
+
+    if (error) {
+      console.error('Erro ao excluir pressão arterial:', error.message);
+      return;
+    }
+
+    setState(prev => ({
+      ...prev,
+      bloodPressureEntries: prev.bloodPressureEntries.filter(entry => entry.id !== id)
+    }));
   };
 
   const addTransaction = async (t: Omit<Transaction, 'id' | 'createdAt'>) => {
@@ -694,7 +850,7 @@ const App: React.FC = () => {
     const dbUpdates: any = {};
     if (updates.category !== undefined) dbUpdates.category = updates.category;
     if (updates.value !== undefined) dbUpdates.value = updates.value;
-    if (updates.date !== undefined) dbUpdates.date = updates.date;
+    if (updates.date !== undefined) dbUpdates.date = new Date(`${updates.date}T00:00:00`).toISOString();
     if (updates.type !== undefined) dbUpdates.type = updates.type;
     if (updates.recurring !== undefined) dbUpdates.recurring = updates.recurring;
     if (updates.notes !== undefined) dbUpdates.notes = updates.notes;
@@ -718,10 +874,65 @@ const App: React.FC = () => {
     }
   };
 
+  const updateTransactionSeries = async (seriesId: string, updates: Partial<Transaction>) => {
+    if (!state.auth.userId) return;
+
+    const dbUpdates: any = {};
+    if (updates.category !== undefined) dbUpdates.category = updates.category;
+    if (updates.value !== undefined) dbUpdates.value = updates.value;
+    if (updates.date !== undefined) dbUpdates.date = new Date(`${updates.date}T00:00:00`).toISOString();
+    if (updates.type !== undefined) dbUpdates.type = updates.type;
+    if (updates.recurring !== undefined) dbUpdates.recurring = updates.recurring;
+    if (updates.notes !== undefined) dbUpdates.notes = updates.notes;
+    if (updates.paymentMethod !== undefined) dbUpdates.payment_method = updates.paymentMethod;
+    if (updates.classification !== undefined) dbUpdates.classification = updates.classification;
+    if (updates.creditCardId !== undefined) dbUpdates.credit_card_id = updates.creditCardId;
+    if (updates.isInstallment !== undefined) dbUpdates.is_installment = updates.isInstallment;
+    if (updates.installmentCount !== undefined) dbUpdates.installment_count = updates.installmentCount;
+
+    const { error } = await supabase
+      .from('finance')
+      .update(dbUpdates)
+      .eq('user_id', state.auth.userId)
+      .eq('original_transaction_id', seriesId);
+
+    if (error) {
+      console.error('Erro ao atualizar série de parcelas:', error);
+      return;
+    }
+
+    setState(prev => ({
+      ...prev,
+      finance: prev.finance.map(t =>
+        t.originalTransactionId === seriesId ? { ...t, ...updates } : t
+      )
+    }));
+  };
+
   const deleteTransaction = async (id: string) => {
     if (!state.auth.userId) return;
     const { error } = await supabase.from('finance').delete().eq('id', id);
     if (!error) setState(p => ({ ...p, finance: p.finance.filter(t => t.id !== id) }));
+  };
+
+  const deleteTransactionSeries = async (seriesId: string) => {
+    if (!state.auth.userId) return;
+
+    const { error } = await supabase
+      .from('finance')
+      .delete()
+      .eq('user_id', state.auth.userId)
+      .eq('original_transaction_id', seriesId);
+
+    if (error) {
+      console.error('Erro ao excluir série de parcelas:', error);
+      return;
+    }
+
+    setState(prev => ({
+      ...prev,
+      finance: prev.finance.filter(t => t.originalTransactionId !== seriesId)
+    }));
   };
 
   const updateShopping = async (items: ShoppingItem[]) => {
@@ -814,9 +1025,8 @@ const App: React.FC = () => {
       creditCards: creditCards !== undefined ? creditCards : prev.creditCards
     }));
 
-    // Aplica o tema visualmente
-    if (theme === 'dark') document.documentElement.classList.add('dark');
-    else document.documentElement.classList.remove('dark');
+    // Mantemos visual dark para alinhar com o design FinControl em toda a aplicação.
+    document.documentElement.classList.add('dark');
   };
 
   const syncCreditCards = async (cards: CreditCard[]) => {
@@ -898,8 +1108,7 @@ const App: React.FC = () => {
   ];
 
   useEffect(() => {
-    if (state.theme === 'dark') document.documentElement.classList.add('dark');
-    else document.documentElement.classList.remove('dark');
+    document.documentElement.classList.add('dark');
   }, [state.theme]);
 
   if (loadingSession) {
@@ -919,9 +1128,9 @@ const App: React.FC = () => {
   if (!state.auth.isLoggedIn) return <AuthView onLogin={() => { }} />;
 
   return (
-    <div className="flex min-h-screen bg-gradient-to-br from-slate-50 via-slate-50 to-slate-100 dark:from-slate-950 dark:via-slate-900 dark:to-slate-800 font-sans text-slate-900 dark:text-slate-100 transition-all duration-500">
-      <aside className={`hidden md:flex flex-col bg-white dark:bg-slate-900 dark:from-slate-900 dark:to-slate-800 border-r border-slate-200 dark:border-slate-700 fixed h-full z-20 transition-all duration-300 shadow-lg ${isSidebarCollapsed ? 'w-16' : 'w-56'}`}>
-        <div className={`p-5 border-b border-slate-100 dark:border-slate-800 flex items-center ${isSidebarCollapsed ? 'justify-center' : 'justify-between'}`}>
+    <div className="fc-theme flex min-h-screen bg-transparent font-sans text-slate-100 transition-all duration-500">
+      <aside className={`hidden md:flex flex-col bg-slate-950/70 border-r border-indigo-500/20 fixed h-full z-20 transition-all duration-300 shadow-lg backdrop-blur-xl ${isSidebarCollapsed ? 'w-16' : 'w-56'}`}>
+        <div className={`h-[64px] md:h-[72px] px-4 border-b border-slate-100 dark:border-slate-800 flex items-center ${isSidebarCollapsed ? 'justify-center' : 'justify-between'}`}>
           {!isSidebarCollapsed && <h1 className="text-sm font-semibold text-indigo-600 dark:text-indigo-400 truncate tracking-tight">{state.profile.houseName || 'Casa360'}</h1>}
           <button onClick={() => setIsSidebarCollapsed(!isSidebarCollapsed)} className="p-1 text-slate-300">
             {isSidebarCollapsed ? <ChevronRight size={18} /> : <ChevronLeft size={18} />}
@@ -932,7 +1141,7 @@ const App: React.FC = () => {
             <button
               key={item.id}
               onClick={() => { setActiveTab(item.id as TabId); setIsSidebarOpen(false); }}
-              className={`w-full flex items-center gap-3 px-3 py-3 rounded-xl transition-all duration-200 hover:scale-105 ${activeTab === item.id ? 'bg-gradient-to-r from-indigo-500 to-purple-600 text-white shadow-lg border border-indigo-400/50' : 'text-slate-500 hover:bg-gradient-to-r hover:from-slate-100 hover:to-slate-200 dark:hover:from-slate-700 dark:hover:to-slate-600 hover:text-slate-700 dark:hover:text-slate-300'
+              className={`w-full flex items-center gap-3 px-3 py-3 rounded-xl transition-all duration-200 hover:scale-105 ${activeTab === item.id ? 'bg-gradient-to-r from-indigo-500 to-purple-600 text-white shadow-lg border border-indigo-400/50' : 'text-slate-400 hover:bg-indigo-500/10 hover:text-slate-100'
                 } ${isSidebarCollapsed ? 'justify-center' : ''}`}
             >
               {item.icon}
@@ -949,7 +1158,7 @@ const App: React.FC = () => {
       </aside>
 
       <div className={`flex-1 flex flex-col min-w-0 transition-all duration-300 ${isSidebarCollapsed ? 'md:ml-16' : 'md:ml-56'}`}>
-        <header className="sticky top-0 z-10 bg-white/90 dark:bg-slate-900/80 backdrop-blur-lg border-b border-slate-200 dark:border-slate-700 px-3 md:px-6 py-3 md:py-4 flex justify-between items-center shadow-md">
+        <header className="sticky top-0 z-10 h-[64px] md:h-[72px] bg-slate-950/65 backdrop-blur-xl border-b border-indigo-500/20 px-3 md:px-6 py-0 flex justify-between items-center shadow-md">
           <div className="flex items-center gap-2 md:gap-3 min-w-0 flex-1">
             <h2 className="text-xs md:text-sm font-medium text-slate-800 dark:text-slate-200 uppercase tracking-wide truncate">
               {navItems.find(i => i.id === activeTab)?.label}
@@ -969,14 +1178,38 @@ const App: React.FC = () => {
         <main className="flex-1 p-3 md:p-6 max-w-full w-full mb-20 md:mb-0 overflow-x-hidden">
           {activeTab === 'dashboard' && <Dashboard state={state} onAction={() => setActiveTab('routine')} />}
           {activeTab === 'routine' && <RoutineView tasks={state.tasks} onAdd={addTask} onUpdate={updateTask} onDelete={deleteTask} />}
-          {activeTab === 'finance' && <FinanceView transactions={state.finance} tasks={state.tasks} creditCards={state.creditCards} onAdd={addTransaction} onUpdate={updateTransaction} onDelete={deleteTransaction} />}
-          {activeTab === 'health' && <HealthView medications={state.medications} onAdd={addMedication} onUpdate={updateMedication} onTakeDose={takeMedicationDose} onDelete={deleteMedication} />}
+          {activeTab === 'finance' && (
+            <FinanceView
+              transactions={state.finance}
+              tasks={state.tasks}
+              creditCards={state.creditCards}
+              onAdd={addTransaction}
+              onUpdate={updateTransaction}
+              onDelete={deleteTransaction}
+              onUpdateSeries={updateTransactionSeries}
+              onDeleteSeries={deleteTransactionSeries}
+            />
+          )}
+          {activeTab === 'health' && (
+            <HealthView
+              medications={state.medications}
+              bloodPressureEntries={state.bloodPressureEntries}
+              onAdd={addMedication}
+              onUpdate={updateMedication}
+              onTakeDose={takeMedicationDose}
+              onDeleteDose={deleteMedicationDose}
+              onDelete={deleteMedication}
+              onAddBloodPressure={addBloodPressureEntry}
+              onUpdateBloodPressure={updateBloodPressureEntry}
+              onDeleteBloodPressure={deleteBloodPressureEntry}
+            />
+          )}
           {activeTab === 'shopping' && <ShoppingView items={state.shoppingList} onUpdate={updateShopping} />}
           {activeTab === 'settings' && <SettingsView state={state} onUpdate={(ns) => updateProfile(ns.profile, ns.theme, ns.creditCards)} onLogout={() => supabase.auth.signOut()} />}
         </main>
       </div>
 
-      <nav className="md:hidden fixed bottom-3 left-3 right-3 z-[90] bg-white/95 dark:bg-slate-900/95 backdrop-blur-lg border border-slate-200 dark:border-slate-700 shadow-xl rounded-3xl p-2 flex items-center justify-around safe-bottom">
+      <nav className="md:hidden fixed bottom-3 left-3 right-3 z-[90] bg-slate-950/80 backdrop-blur-xl border border-indigo-500/20 shadow-xl rounded-3xl p-2 flex items-center justify-around safe-bottom">
         {navItems.map((item) => (
           <button key={item.id} onClick={() => setActiveTab(item.id as TabId)} className={`flex flex-col items-center justify-center w-14 h-14 rounded-2xl transition-all duration-200 active:scale-95 ${activeTab === item.id ? 'text-white bg-gradient-to-br from-indigo-500 to-purple-600 shadow-lg scale-105' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300 hover:bg-slate-100 dark:hover:bg-slate-700'}`}>
             {item.icon}

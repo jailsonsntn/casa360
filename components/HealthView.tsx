@@ -1,5 +1,5 @@
 ﻿import React, { useState, useEffect } from 'react';
-import { Medication } from '../types';
+import { BloodPressureEntry, Medication } from '../types';
 import {
   Pill,
   Plus,
@@ -17,15 +17,33 @@ import { notificationService } from '../services/notificationService';
 
 interface HealthViewProps {
   medications: Medication[];
+  bloodPressureEntries: BloodPressureEntry[];
   onAdd: (med: Omit<Medication, 'id' | 'isActive'>) => void;
   onUpdate: (id: string, updates: Partial<Medication>) => void;
   onTakeDose: (id: string) => void;
+  onDeleteDose: (medicationId: string, doseId: string) => void;
   onDelete: (id: string) => void;
+  onAddBloodPressure: (entry: Omit<BloodPressureEntry, 'id' | 'createdAt'>) => void;
+  onUpdateBloodPressure: (id: string, updates: Partial<Omit<BloodPressureEntry, 'id' | 'createdAt'>>) => void;
+  onDeleteBloodPressure: (id: string) => void;
 }
 
-const HealthView: React.FC<HealthViewProps> = ({ medications, onAdd, onUpdate, onTakeDose, onDelete }) => {
+const HealthView: React.FC<HealthViewProps> = ({
+  medications,
+  bloodPressureEntries,
+  onAdd,
+  onUpdate,
+  onTakeDose,
+  onDeleteDose,
+  onDelete,
+  onAddBloodPressure,
+  onUpdateBloodPressure,
+  onDeleteBloodPressure
+}) => {
   const [isAdding, setIsAdding] = useState(false);
   const [editingMed, setEditingMed] = useState<Medication | null>(null);
+  const [isAddingPressure, setIsAddingPressure] = useState(false);
+  const [editingPressure, setEditingPressure] = useState<BloodPressureEntry | null>(null);
 
   const [name, setName] = useState('');
   const [person, setPerson] = useState('');
@@ -36,6 +54,12 @@ const HealthView: React.FC<HealthViewProps> = ({ medications, onAdd, onUpdate, o
   const [firstDoseTime, setFirstDoseTime] = useState('');
   const [notificationEnabled, setNotificationEnabled] = useState(false);
   const [alarmTimes, setAlarmTimes] = useState<string[]>([]);
+  const [systolic, setSystolic] = useState('');
+  const [diastolic, setDiastolic] = useState('');
+  const [pulse, setPulse] = useState('');
+  const [measuredDate, setMeasuredDate] = useState('');
+  const [measuredTime, setMeasuredTime] = useState('');
+  const [pressureNotes, setPressureNotes] = useState('');
 
   // Função para calcular horários dos alarmes baseado na frequência
   const calculateAlarmTimes = (frequency: string, startTime?: string) => {
@@ -112,6 +136,22 @@ const HealthView: React.FC<HealthViewProps> = ({ medications, onAdd, onUpdate, o
     setNotificationEnabled(notificationService.getPermissionStatus() === 'granted');
   }, []);
 
+  useEffect(() => {
+    if (!editingPressure) return;
+
+    const measuredAt = new Date(editingPressure.measuredAt);
+    const date = measuredAt.toISOString().slice(0, 10);
+    const time = `${measuredAt.getHours().toString().padStart(2, '0')}:${measuredAt.getMinutes().toString().padStart(2, '0')}`;
+
+    setSystolic(editingPressure.systolic.toString());
+    setDiastolic(editingPressure.diastolic.toString());
+    setPulse(editingPressure.pulse?.toString() || '');
+    setMeasuredDate(date);
+    setMeasuredTime(time);
+    setPressureNotes(editingPressure.notes || '');
+    setIsAddingPressure(true);
+  }, [editingPressure]);
+
   const resetForm = () => {
     setName(''); setPerson(''); setDose(''); setFreq('8h/8h'); setStock('30');
     setFirstDoseDate(''); setFirstDoseTime('');
@@ -146,6 +186,68 @@ const HealthView: React.FC<HealthViewProps> = ({ medications, onAdd, onUpdate, o
     );
   };
 
+  const resetPressureForm = () => {
+    const now = new Date();
+    const date = now.toISOString().slice(0, 10);
+    const time = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+
+    setSystolic('');
+    setDiastolic('');
+    setPulse('');
+    setMeasuredDate(date);
+    setMeasuredTime(time);
+    setPressureNotes('');
+    setEditingPressure(null);
+    setIsAddingPressure(false);
+  };
+
+  const openPressureForm = () => {
+    const now = new Date();
+    const date = now.toISOString().slice(0, 10);
+    const time = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
+
+    setMeasuredDate(date);
+    setMeasuredTime(time);
+    setSystolic('');
+    setDiastolic('');
+    setPulse('');
+    setPressureNotes('');
+    setEditingPressure(null);
+    setIsAddingPressure(true);
+  };
+
+  const handleSubmitPressure = (e: React.FormEvent) => {
+    e.preventDefault();
+
+    const sys = Number(systolic);
+    const dia = Number(diastolic);
+    const pulseValue = pulse ? Number(pulse) : undefined;
+
+    if (!sys || !dia || !measuredDate || !measuredTime) return;
+
+    const measuredAt = new Date(`${measuredDate}T${measuredTime}:00`).toISOString();
+
+    if (editingPressure) {
+      onUpdateBloodPressure(editingPressure.id, {
+        systolic: sys,
+        diastolic: dia,
+        pulse: pulseValue,
+        measuredAt,
+        notes: pressureNotes.trim() || undefined
+      });
+    } else {
+      onAddBloodPressure({
+        systolic: sys,
+        diastolic: dia,
+        pulse: pulseValue,
+        measuredAt,
+        notes: pressureNotes.trim() || undefined
+      });
+    }
+
+    resetPressureForm();
+  };
+
   const toggleNotifications = async () => {
     if (!notificationEnabled) {
       const granted = await notificationService.ensureNotificationPermission();
@@ -175,6 +277,12 @@ const HealthView: React.FC<HealthViewProps> = ({ medications, onAdd, onUpdate, o
             </div>
             <div className="flex items-center gap-3">
               <button
+                onClick={openPressureForm}
+                className="bg-emerald-600 text-white px-4 py-2 rounded-lg font-medium text-xs shadow-sm flex items-center gap-1.5 hover:bg-emerald-700 transition-colors active:scale-95"
+              >
+                <Plus size={14} /> Nova Pressão
+              </button>
+              <button
                 onClick={toggleNotifications}
                 className={`px-3 py-2 rounded-lg font-medium text-xs shadow-sm flex items-center gap-1.5 transition-all active:scale-95 ${
                   notificationEnabled
@@ -193,6 +301,69 @@ const HealthView: React.FC<HealthViewProps> = ({ medications, onAdd, onUpdate, o
               </button>
             </div>
           </div>
+        </div>
+
+        {/* Blood Pressure Card */}
+        <div className="bg-white dark:bg-zinc-900 rounded-2xl shadow-sm border border-gray-200 dark:border-zinc-800 p-5 mb-6">
+          <div className="flex flex-col md:flex-row md:items-center md:justify-between gap-3 mb-4">
+            <div>
+              <h2 className="text-base font-bold text-gray-900 dark:text-zinc-100">Pressao Arterial</h2>
+              <p className="text-xs text-gray-600 dark:text-zinc-400">Registre diariamente, edite e acompanhe seu historico.</p>
+            </div>
+            <button
+              onClick={openPressureForm}
+              className="bg-emerald-600 text-white px-3 py-1.5 rounded-lg font-medium text-xs shadow-sm flex items-center gap-1.5 hover:bg-emerald-700 transition-colors active:scale-95"
+            >
+              <Plus size={12} /> Registrar Agora
+            </button>
+          </div>
+
+          {bloodPressureEntries.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-gray-300 dark:border-zinc-700 p-5 text-center">
+              <p className="text-xs text-gray-600 dark:text-zinc-400">Nenhum registro de pressao ainda.</p>
+            </div>
+          ) : (
+            <div className="space-y-2">
+              {bloodPressureEntries.slice(0, 12).map((entry) => {
+                const measuredAtDate = new Date(entry.measuredAt);
+                return (
+                  <div
+                    key={entry.id}
+                    className="rounded-lg border border-emerald-200 dark:border-emerald-900/50 bg-emerald-50/80 dark:bg-emerald-900/10 px-3 py-2 flex items-center justify-between gap-3"
+                  >
+                    <div className="min-w-0 flex-1">
+                      <div className="flex items-center gap-2 text-xs text-emerald-800 dark:text-emerald-300 font-semibold">
+                        <span>{entry.systolic}/{entry.diastolic} mmHg</span>
+                        {entry.pulse ? <span className="text-emerald-700/80 dark:text-emerald-400/80">| Pulso {entry.pulse} bpm</span> : null}
+                      </div>
+                      <div className="text-[11px] text-emerald-700/80 dark:text-emerald-400/80 mt-0.5">
+                        {measuredAtDate.toLocaleDateString('pt-BR')} as {measuredAtDate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                      </div>
+                      {entry.notes && (
+                        <p className="text-[11px] text-gray-700 dark:text-zinc-300 mt-1 truncate">{entry.notes}</p>
+                      )}
+                    </div>
+                    <div className="flex items-center gap-1 shrink-0">
+                      <button
+                        onClick={() => setEditingPressure(entry)}
+                        className="p-1.5 text-emerald-700/80 hover:text-blue-600 dark:hover:text-blue-400 transition-colors rounded hover:bg-blue-50 dark:hover:bg-blue-900/20"
+                        title="Editar pressao"
+                      >
+                        <Edit2 size={12} />
+                      </button>
+                      <button
+                        onClick={() => onDeleteBloodPressure(entry.id)}
+                        className="p-1.5 text-emerald-700/80 hover:text-rose-600 dark:hover:text-rose-400 transition-colors rounded hover:bg-rose-50 dark:hover:bg-rose-900/20"
+                        title="Excluir registro"
+                      >
+                        <Trash2 size={12} />
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
 
         {/* Medications Grid */}
@@ -258,9 +429,18 @@ const HealthView: React.FC<HealthViewProps> = ({ medications, onAdd, onUpdate, o
                                 {isToday ? 'Hoje' : doseDate.toLocaleDateString('pt-BR', { day: '2-digit', month: '2-digit' })}
                               </span>
                             </div>
-                            <span className="text-[10px] md:text-xs font-medium shrink-0">
-                              {doseDate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
-                            </span>
+                            <div className="flex items-center gap-1 shrink-0">
+                              <span className="text-[10px] md:text-xs font-medium">
+                                {doseDate.toLocaleTimeString('pt-BR', { hour: '2-digit', minute: '2-digit' })}
+                              </span>
+                              <button
+                                onClick={() => onDeleteDose(med.id, dose.id)}
+                                className="p-0.5 rounded text-green-700/70 hover:text-rose-600 hover:bg-rose-100 dark:hover:bg-rose-900/30 transition-colors"
+                                title="Apagar dose"
+                              >
+                                <Trash2 size={10} />
+                              </button>
+                            </div>
                           </div>
                         );
                       })}
@@ -431,6 +611,107 @@ const HealthView: React.FC<HealthViewProps> = ({ medications, onAdd, onUpdate, o
                   onClick={handleSubmit}
                   type="button"
                   className="w-full bg-rose-600 hover:bg-rose-700 text-white py-2 rounded-lg font-medium text-xs shadow-sm flex items-center justify-center gap-1.5 transition-all active:scale-95"
+                >
+                  <Save size={14} /> Salvar
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Add/Edit Blood Pressure Modal */}
+        {isAddingPressure && (
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[150] flex items-center justify-center p-2">
+            <div className="bg-white dark:bg-zinc-900 w-full max-w-sm rounded-2xl shadow-2xl border border-gray-200 dark:border-zinc-800 flex flex-col max-h-[95vh] overflow-hidden animate-in zoom-in-95 duration-200">
+              <div className="px-4 py-3 border-b border-gray-100 dark:border-zinc-800 flex justify-between items-center bg-white dark:bg-zinc-900 shrink-0">
+                <h3 className="font-semibold text-sm text-gray-900 dark:text-zinc-100">
+                  {editingPressure ? 'Editar' : 'Nova'} Pressao Arterial
+                </h3>
+                <button
+                  onClick={resetPressureForm}
+                  className="p-0.5 text-gray-400 hover:text-gray-600 dark:hover:text-zinc-300 transition-colors rounded hover:bg-gray-100 dark:hover:bg-zinc-800"
+                >
+                  <X size={16} />
+                </button>
+              </div>
+
+              <form onSubmit={handleSubmitPressure} className="flex-1 overflow-y-auto p-4 space-y-3 bg-white dark:bg-zinc-900">
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-1">
+                    <label className="text-xs font-medium text-gray-700 dark:text-zinc-300">Sistolica</label>
+                    <input
+                      type="number"
+                      value={systolic}
+                      onChange={e => setSystolic(e.target.value)}
+                      className="w-full bg-gray-50 dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-lg px-3 py-2 outline-none font-medium text-xs text-gray-900 dark:text-zinc-100 focus:border-emerald-500 transition-colors"
+                      placeholder="120"
+                      required
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-medium text-gray-700 dark:text-zinc-300">Diastolica</label>
+                    <input
+                      type="number"
+                      value={diastolic}
+                      onChange={e => setDiastolic(e.target.value)}
+                      className="w-full bg-gray-50 dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-lg px-3 py-2 outline-none font-medium text-xs text-gray-900 dark:text-zinc-100 focus:border-emerald-500 transition-colors"
+                      placeholder="80"
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-gray-700 dark:text-zinc-300">Pulso (opcional)</label>
+                  <input
+                    type="number"
+                    value={pulse}
+                    onChange={e => setPulse(e.target.value)}
+                    className="w-full bg-gray-50 dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-lg px-3 py-2 outline-none font-medium text-xs text-gray-900 dark:text-zinc-100 focus:border-emerald-500 transition-colors"
+                    placeholder="72"
+                  />
+                </div>
+
+                <div className="grid grid-cols-2 gap-2">
+                  <div className="space-y-1">
+                    <label className="text-xs font-medium text-gray-700 dark:text-zinc-300">Data</label>
+                    <input
+                      type="date"
+                      value={measuredDate}
+                      onChange={e => setMeasuredDate(e.target.value)}
+                      className="w-full bg-gray-50 dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-lg px-3 py-2 outline-none font-medium text-xs text-gray-900 dark:text-zinc-100 focus:border-emerald-500 transition-colors"
+                      required
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <label className="text-xs font-medium text-gray-700 dark:text-zinc-300">Hora</label>
+                    <input
+                      type="time"
+                      value={measuredTime}
+                      onChange={e => setMeasuredTime(e.target.value)}
+                      className="w-full bg-gray-50 dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-lg px-3 py-2 outline-none font-medium text-xs text-gray-900 dark:text-zinc-100 focus:border-emerald-500 transition-colors"
+                      required
+                    />
+                  </div>
+                </div>
+
+                <div className="space-y-1">
+                  <label className="text-xs font-medium text-gray-700 dark:text-zinc-300">Observacoes (opcional)</label>
+                  <textarea
+                    value={pressureNotes}
+                    onChange={e => setPressureNotes(e.target.value)}
+                    rows={3}
+                    className="w-full bg-gray-50 dark:bg-zinc-800 border border-gray-200 dark:border-zinc-700 rounded-lg px-3 py-2 outline-none font-medium text-xs text-gray-900 dark:text-zinc-100 focus:border-emerald-500 transition-colors resize-none"
+                    placeholder="Ex.: medi apos cafe da manha"
+                  />
+                </div>
+              </form>
+
+              <div className="px-4 py-3 bg-white dark:bg-zinc-900 border-t border-gray-100 dark:border-zinc-800 shrink-0">
+                <button
+                  onClick={handleSubmitPressure}
+                  type="button"
+                  className="w-full bg-emerald-600 hover:bg-emerald-700 text-white py-2 rounded-lg font-medium text-xs shadow-sm flex items-center justify-center gap-1.5 transition-all active:scale-95"
                 >
                   <Save size={14} /> Salvar
                 </button>

@@ -1,5 +1,5 @@
 <!DOCTYPE html>
-<html lang="pt-BR" class="h-full">
+<html lang="pt-BR" class="h-full dark">
 
 <head>
   <meta charset="UTF-8" />
@@ -11,7 +11,7 @@
   <link rel="icon" type="image/png" href="https://cdn-icons-png.flaticon.com/512/619/619153.png">
   <link rel="apple-touch-icon" href="https://cdn-icons-png.flaticon.com/512/619/619153.png">
   <script src="https://cdn.tailwindcss.com"></script>
-  <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700;800;900&display=swap"
+  <link href="https://fonts.googleapis.com/css2?family=Sora:wght@400;500;600;700;800&family=Manrope:wght@400;500;600;700;800&display=swap"
     rel="stylesheet">
   <script>
     tailwind.config = {
@@ -19,7 +19,7 @@
       theme: {
         extend: {
           fontFamily: {
-            sans: ['Inter', 'sans-serif'],
+            sans: ['Sora', 'Manrope', 'sans-serif'],
           },
           animation: {
             'fade-in': 'fadeIn 0.5s ease-in-out',
@@ -87,7 +87,7 @@
 </script>
 </head>
 
-<body class="bg-slate-50 dark:bg-slate-950 select-none h-full">
+<body class="bg-[#07080f] text-slate-100 select-none h-full">
   <div id="root" class="h-full"></div>
   <script type="module" src="/index.tsx"></script>
 </body>
