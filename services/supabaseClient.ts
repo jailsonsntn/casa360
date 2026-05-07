@@ -11,8 +11,9 @@ const safeSupabaseAnonKey = supabaseAnonKey || 'placeholder-anon-key';
 
 export const supabase = createClient(safeSupabaseUrl, safeSupabaseAnonKey, {
 	auth: {
+		storageKey: 'casa360-auth-v1',
 		persistSession: isSupabaseConfigured,
 		autoRefreshToken: isSupabaseConfigured,
-		detectSessionInUrl: isSupabaseConfigured,
+		detectSessionInUrl: false,
 	},
 });

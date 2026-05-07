@@ -68,6 +68,7 @@ type TabId = 'dashboard' | 'routine' | 'finance' | 'health' | 'shopping' | 'sett
 
 const AUTH_LAST_ACTIVITY_KEY = 'casa360_auth_last_activity';
 const AUTH_MAX_INACTIVITY_MS = 2 * 24 * 60 * 60 * 1000; // 2 dias
+const NOTIFIED_ALARMS_STORAGE_PREFIX = 'casa360_notified_alarms';
 
 const UUID_REGEX = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
 
@@ -119,6 +120,51 @@ const isSessionExpiredByInactivity = (session: any) => {
   return Date.now() - reference > AUTH_MAX_INACTIVITY_MS;
 };
 
+const getNotifiedAlarmsKey = (userId: string) => `${NOTIFIED_ALARMS_STORAGE_PREFIX}:${userId}`;
+
+const readNotifiedAlarms = (userId?: string | null): Set<string> => {
+  if (!userId) return new Set();
+
+  try {
+    const raw = localStorage.getItem(getNotifiedAlarmsKey(userId));
+    if (!raw) return new Set();
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return new Set();
+    return new Set(parsed.filter((value) => typeof value === 'string'));
+  } catch {
+    return new Set();
+  }
+};
+
+const markAlarmAsNotified = (userId?: string | null, alarmId?: string | null) => {
+  if (!userId || !alarmId) return;
+
+  const existing = readNotifiedAlarms(userId);
+  if (existing.has(alarmId)) return;
+
+  existing.add(alarmId);
+  try {
+    localStorage.setItem(getNotifiedAlarmsKey(userId), JSON.stringify(Array.from(existing)));
+  } catch {
+    // Ignore storage write failures in restricted contexts.
+  }
+};
+
+const hasAlarmBeenNotified = (userId?: string | null, alarmId?: string | null) => {
+  if (!userId || !alarmId) return false;
+  return readNotifiedAlarms(userId).has(alarmId);
+};
+
+const clearNotifiedAlarms = (userId?: string | null) => {
+  if (!userId) return;
+
+  try {
+    localStorage.removeItem(getNotifiedAlarmsKey(userId));
+  } catch {
+    // Ignore storage failures in restricted contexts.
+  }
+};
+
 const App: React.FC = () => {
   /* 
     PERSISTENCE: Restore active tab from localStorage if available.
@@ -146,6 +192,10 @@ const App: React.FC = () => {
     if (!state.auth.isLoggedIn) return;
 
     const alarmInterval = setInterval(() => {
+      if (typeof document !== 'undefined' && document.visibilityState !== 'visible') {
+        return;
+      }
+
       const now = new Date();
       const nowTime = `${now.getHours().toString().padStart(2, '0')}:${now.getMinutes().toString().padStart(2, '0')}`;
       const todayKey = now.toISOString().slice(0, 10);
@@ -183,7 +233,9 @@ const App: React.FC = () => {
             shouldNotify = diffMinutes >= 0 && diffMinutes < 2;
           }
 
-          if (shouldNotify && task.alarmConfig.lastNotified !== nowKey) {
+          const alarmDedupKey = `${nowKey}:task:${task.id}`;
+
+          if (shouldNotify && task.alarmConfig.lastNotified !== nowKey && !hasAlarmBeenNotified(state.auth.userId, alarmDedupKey)) {
             notificationService.triggerAlarmFeedback({
               title: `Tarefa: ${task.title}`,
               body: `Horário agendado: ${scheduleLabel}`,
@@ -202,6 +254,8 @@ const App: React.FC = () => {
                 alarmConfig: { ...t.alarmConfig!, lastNotified: nowKey }
               } : t)
             }));
+
+            markAlarmAsNotified(state.auth.userId, alarmDedupKey);
           }
         }
       });
@@ -211,6 +265,9 @@ const App: React.FC = () => {
         const times = med.alarmConfig.times || [];
         if (!times.includes(nowTime)) return;
         if (med.alarmConfig.lastNotified === nowKey) return;
+
+        const alarmDedupKey = `${nowKey}:med:${med.id}`;
+        if (hasAlarmBeenNotified(state.auth.userId, alarmDedupKey)) return;
 
         notificationService.triggerAlarmFeedback({
           title: `Hora do medicamento: ${med.name}`,
@@ -230,6 +287,8 @@ const App: React.FC = () => {
             alarmConfig: { ...m.alarmConfig!, lastNotified: nowKey }
           } : m)
         }));
+
+        markAlarmAsNotified(state.auth.userId, alarmDedupKey);
       });
     }, 30000);
 
@@ -507,14 +566,6 @@ const App: React.FC = () => {
 
     let mounted = true;
 
-    // SAFETY NET: If session check hangs, quickly fallback to auth screen
-    const safetyTimeout = setTimeout(() => {
-      if (mounted && loadingSession) {
-        console.warn("Session check timed out, forcing login screen.");
-        setLoadingSession(false);
-      }
-    }, 1200);
-
     const handleAuthChange = async (session: any) => {
       if (!mounted) return;
       if (session?.user) {
@@ -522,6 +573,7 @@ const App: React.FC = () => {
           console.warn('Sessao expirada por inatividade maior que 2 dias.');
           await supabase.auth.signOut();
           clearAuthActivity();
+          clearNotifiedAlarms(state.auth.userId);
           setState(INITIAL_STATE);
           setLoadingSession(false);
           return;
@@ -531,6 +583,7 @@ const App: React.FC = () => {
         await fetchUserData(session.user.id, session.user.email!);
       } else {
         clearAuthActivity();
+        clearNotifiedAlarms(state.auth.userId);
         setState(INITIAL_STATE);
         setLoadingSession(false);
       }
@@ -558,6 +611,7 @@ const App: React.FC = () => {
         }
       } else if (event === 'SIGNED_OUT') {
         clearAuthActivity();
+        clearNotifiedAlarms(state.auth.userId);
         setState(INITIAL_STATE);
         setLoadingSession(false);
       }
@@ -566,7 +620,6 @@ const App: React.FC = () => {
     return () => {
       mounted = false;
       subscription.unsubscribe();
-      clearTimeout(safetyTimeout);
     };
   }, [fetchUserData, state.auth.userId]);
 
