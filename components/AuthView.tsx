@@ -91,8 +91,11 @@ const AuthView: React.FC<AuthViewProps> = ({ onLogin }) => {
     );
   }
 
+  const isNative = typeof window !== 'undefined' && !!(window as any).Capacitor?.isNativePlatform?.();
+
   return (
     <div className="min-h-screen bg-[#050b1f] text-slate-100 flex flex-col px-4 sm:px-0 pt-4 sm:pt-0" style={{ backgroundImage: 'radial-gradient(circle at 12% -16%, rgba(124,107,255,0.25) 0%, rgba(124,107,255,0) 42%), radial-gradient(circle at 90% 4%, rgba(6,182,212,0.2) 0%, rgba(6,182,212,0) 34%)' }}>
+      {!isNative && (
       <div className="relative sm:absolute top-0 sm:top-5 left-0 sm:left-5 z-10 mb-4 sm:mb-0">
         <button
           onClick={() => window.location.assign('/')}
@@ -102,6 +105,7 @@ const AuthView: React.FC<AuthViewProps> = ({ onLogin }) => {
           Voltar para início
         </button>
       </div>
+      )}
 
       <div className="flex-1 flex items-center justify-center py-2 sm:p-6">
         <div className="w-full max-w-md rounded-2xl border border-indigo-500/30 bg-slate-950/75 backdrop-blur shadow-2xl shadow-slate-950/60 p-5 sm:p-8 space-y-6">

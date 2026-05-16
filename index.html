@@ -1,6 +1,27 @@
 <!DOCTYPE html>
 <html lang="pt-BR">
 <head>
+  <!-- Redireciona para o app quando rodando no APK nativo (Capacitor).
+       O bridge Capacitor é injetado antes do page load no WebView Android,
+       mas adicionamos também um fallback via DOMContentLoaded para garantir. -->
+  <script>
+    (function () {
+      function goToApp() {
+        try {
+          if (window.Capacitor && window.Capacitor.isNativePlatform && window.Capacitor.isNativePlatform()) {
+            window.location.replace('app.html');
+            return true;
+          }
+        } catch (e) {}
+        return false;
+      }
+      // Tentativa síncrona (funciona quando o bridge já está injetado)
+      if (!goToApp()) {
+        // Fallback: aguarda DOMContentLoaded caso o bridge inicialize depois
+        document.addEventListener('DOMContentLoaded', goToApp, { once: true });
+      }
+    })();
+  </script>
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="theme-color" content="#050b1f" />

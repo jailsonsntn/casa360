@@ -57,10 +57,8 @@ android {
     }
 
     applicationVariants.configureEach { variant ->
-        if (variant.buildType.name == 'release') {
-            variant.outputs.configureEach {
-                outputFileName = 'casa360.apk'
-            }
+        variant.outputs.configureEach {
+            outputFileName = 'casa360.apk'
         }
     }
 }

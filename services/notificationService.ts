@@ -2,6 +2,32 @@
 import { AlarmSoundType, VibrationIntensity } from '../types';
 import { LocalNotifications } from '@capacitor/local-notifications';
 
+const CHANNEL_ID = 'casa360_alarms';
+let channelCreated = false;
+
+/**
+ * Garante que o canal de notificação existe (Android 8+ / API 26+).
+ * Deve ser chamado antes de qualquer LocalNotifications.schedule().
+ */
+async function ensureNotificationChannel(): Promise<void> {
+  if (channelCreated) return;
+  try {
+    await LocalNotifications.createChannel({
+      id: CHANNEL_ID,
+      name: 'Alarmes Casa360',
+      description: 'Lembretes e alarmes do aplicativo',
+      importance: 5,          // IMPORTANCE_HIGH — heads-up + som
+      visibility: 1,          // VISIBILITY_PUBLIC
+      sound: 'default',
+      vibration: true,
+      lights: true,
+    });
+    channelCreated = true;
+  } catch (e) {
+    console.warn('[notificationService] Falha ao criar canal de notificação:', e);
+  }
+}
+
 type NotificationPermissionState = NotificationPermission | 'unsupported';
 
 interface PlatformInfo {
@@ -114,14 +140,23 @@ export const notificationService = {
 
     // No Android nativo, dispara notificacao local via plugin Capacitor.
     if (platform.isNativeLike) {
-      void LocalNotifications.schedule({
-        notifications: [{
-          id: Date.now() % 2147483000,
-          title,
-          body,
-          schedule: { at: new Date(Date.now() + 200) }
-        }]
-      });
+      void (async () => {
+        await ensureNotificationChannel();
+        try {
+          await LocalNotifications.schedule({
+            notifications: [{
+              id: Date.now() % 2147483000,
+              title,
+              body,
+              channelId: CHANNEL_ID,
+              schedule: { at: new Date(Date.now() + 500) },
+              smallIcon: 'ic_stat_icon_config_sample',
+            }]
+          });
+        } catch (e) {
+          console.error('[notificationService] Falha ao agendar notificação nativa:', e);
+        }
+      })();
       return true;
     }
     if (!platform.supportsNotificationApi || Notification.permission !== 'granted') return false;
